@@ -121,7 +121,7 @@ class SettingsActivity : AppCompatActivity() {
 
         applyTheme(selectedTheme)
 
-        Toast.makeText(this, R.string.settings_saved, Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, R.string.settings_saved_toast, Toast.LENGTH_SHORT).show()
         finish()
     }
 

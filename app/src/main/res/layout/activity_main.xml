@@ -589,15 +589,15 @@
                         <ImageView
                             android:layout_width="28dp"
                             android:layout_height="28dp"
-                            android:src="@android:drawable/ic_menu_manage"
-                            app:tint="#9E9EAE" />
+                            android:src="@android:drawable/ic_menu_myplaces"
+                            app:tint="#00E676" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/method_settings"
+                            android:text="@string/method_servers"
                             android:textSize="11sp"
-                            android:textColor="#9E9EAE"
+                            android:textColor="#00E676"
                             android:layout_marginTop="6dp"
                             android:gravity="center" />
 

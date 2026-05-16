@@ -96,9 +96,9 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, ManualConnectActivity::class.java))
         }
 
-        // Settings
+        // Settings → now opens ServerListActivity (VPS/VDS servers)
         binding.cardSettings.setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
+            startActivity(Intent(this, ServerListActivity::class.java))
         }
     }
 
