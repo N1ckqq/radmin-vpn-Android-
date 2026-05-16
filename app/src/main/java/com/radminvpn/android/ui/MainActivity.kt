@@ -110,6 +110,18 @@ class MainActivity : AppCompatActivity() {
         binding.btnStats.setOnClickListener {
             startActivity(Intent(this, StatsActivity::class.java))
         }
+
+        binding.btnDirectIp.setOnClickListener {
+            startActivity(Intent(this, DirectIpActivity::class.java))
+        }
+
+        binding.btnQrConnect.setOnClickListener {
+            startActivity(Intent(this, QrConnectActivity::class.java))
+        }
+
+        binding.btnNsdConnect.setOnClickListener {
+            startActivity(Intent(this, NsdConnectActivity::class.java))
+        }
     }
 
     private fun observeState() {
