@@ -259,7 +259,6 @@ class MainActivity : AppCompatActivity() {
                 text = "$statusIcon  ${peer.virtualIp}  (${peer.peerId})"
                 textSize = 13f
                 setTextColor(Color.parseColor("#1565C0"))
-                fontFamily
                 setPadding(0, 4, 0, 4)
             }
             binding.layoutPeers.addView(tv)
