@@ -1,120 +1,125 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F5F5">
+    android:background="#121218">
 
-    <com.google.android.material.appbar.AppBarLayout
+    <!-- Top Bar -->
+    <LinearLayout
+        android:id="@+id/topBar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:elevation="0dp"
-        app:elevation="0dp">
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="20dp"
+        android:background="#0D0D14">
 
-        <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/toolbar"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorPrimary"
-            app:title="P2P VPN"
-            app:titleTextColor="#FFFFFF"
-            app:subtitle="Virtual LAN"
-            app:subtitleTextColor="#B3FFFFFF" />
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/app_name"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF" />
 
-    </com.google.android.material.appbar.AppBarLayout>
+        <ImageButton
+            android:id="@+id/btnSettingsTop"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_manage"
+            android:contentDescription="@string/settings"
+            app:tint="#9E9EAE" />
+
+    </LinearLayout>
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_marginTop="56dp"
         android:fillViewport="true"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        android:clipToPadding="false">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:padding="20dp">
 
-            <!-- Status Card -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardStatus"
+            <!-- Status Indicator: Big Circle + Pulse -->
+            <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="2dp"
-                app:strokeWidth="0dp">
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="8dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:padding="20dp"
-                    android:gravity="center_vertical">
+                    android:orientation="vertical"
+                    android:gravity="center_horizontal">
 
-                    <!-- Animated status indicator -->
                     <FrameLayout
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:layout_marginEnd="16dp">
+                        android:layout_width="100dp"
+                        android:layout_height="100dp">
 
                         <View
                             android:id="@+id/viewPulseOuter"
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
+                            android:layout_width="100dp"
+                            android:layout_height="100dp"
                             android:background="@drawable/circle_pulse"
                             android:layout_gravity="center"
                             android:alpha="0.3" />
 
                         <View
                             android:id="@+id/viewStatusDot"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
+                            android:layout_width="44dp"
+                            android:layout_height="44dp"
                             android:background="@drawable/circle_status"
                             android:layout_gravity="center" />
 
                     </FrameLayout>
 
-                    <LinearLayout
-                        android:layout_width="0dp"
+                    <TextView
+                        android:id="@+id/tvStatus"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:text="@string/status_disconnected"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:textColor="#E0E0E0"
+                        android:layout_marginTop="12dp" />
 
-                        <TextView
-                            android:id="@+id/tvStatus"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Disconnected"
-                            android:textSize="18sp"
-                            android:textStyle="bold"
-                            android:textColor="#212121" />
-
-                        <TextView
-                            android:id="@+id/tvStatusMessage"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Tap to create or join a network"
-                            android:textSize="13sp"
-                            android:textColor="#757575"
-                            android:layout_marginTop="2dp" />
-
-                    </LinearLayout>
+                    <TextView
+                        android:id="@+id/tvStatusMessage"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/status_hint_disconnected"
+                        android:textSize="13sp"
+                        android:textColor="#9E9EAE"
+                        android:layout_marginTop="4dp" />
 
                 </LinearLayout>
 
-            </com.google.android.material.card.MaterialCardView>
+            </FrameLayout>
 
             <!-- Network Info Card (visible when connected) -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardNetworkInfo"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
                 android:layout_marginBottom="12dp"
                 android:visibility="gone"
                 app:cardCornerRadius="16dp"
-                app:cardElevation="2dp"
-                app:cardBackgroundColor="#E3F2FD">
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="#252536"
+                app:strokeColor="#3D3D5C"
+                app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -132,20 +137,23 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Network ID"
-                            android:textSize="12sp"
-                            android:textColor="#1565C0"
-                            android:textAllCaps="true"
+                            android:text="@string/network_id_label"
+                            android:textSize="11sp"
+                            android:textColor="#2979FF"
                             android:letterSpacing="0.1" />
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnCopyId"
                             android:layout_width="wrap_content"
-                            android:layout_height="32dp"
-                            android:text="Copy"
+                            android:layout_height="28dp"
+                            android:text="@string/copy"
                             android:textSize="11sp"
-                            app:cornerRadius="16dp"
-                            style="@style/Widget.MaterialComponents.Button.TextButton" />
+                            android:textColor="#2979FF"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
+                            android:minWidth="0dp"
+                            android:padding="0dp"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp" />
 
                     </LinearLayout>
 
@@ -156,15 +164,14 @@
                         android:text=""
                         android:textSize="28sp"
                         android:textStyle="bold"
-                        android:textColor="#0D47A1"
+                        android:textColor="#FFFFFF"
                         android:fontFamily="monospace"
                         android:letterSpacing="0.3" />
 
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
-                        android:background="#1565C0"
-                        android:alpha="0.2"
+                        android:background="#3D3D5C"
                         android:layout_marginVertical="12dp" />
 
                     <LinearLayout
@@ -181,9 +188,9 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Your IP"
+                                android:text="@string/your_ip"
                                 android:textSize="11sp"
-                                android:textColor="#1565C0" />
+                                android:textColor="#9E9EAE" />
 
                             <TextView
                                 android:id="@+id/tvVirtualIp"
@@ -192,7 +199,7 @@
                                 android:text="10.0.0.1"
                                 android:textSize="16sp"
                                 android:textStyle="bold"
-                                android:textColor="#212121"
+                                android:textColor="#00E676"
                                 android:fontFamily="monospace" />
 
                         </LinearLayout>
@@ -206,9 +213,9 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Peers"
+                                android:text="@string/peers"
                                 android:textSize="11sp"
-                                android:textColor="#1565C0" />
+                                android:textColor="#9E9EAE" />
 
                             <TextView
                                 android:id="@+id/tvPeerCount"
@@ -217,7 +224,7 @@
                                 android:text="0"
                                 android:textSize="16sp"
                                 android:textStyle="bold"
-                                android:textColor="#212121" />
+                                android:textColor="#E0E0E0" />
 
                         </LinearLayout>
 
@@ -242,39 +249,45 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
+                android:layout_marginTop="20dp"
                 android:layout_marginBottom="12dp">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnCreateNetwork"
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
-                    android:text="Create Network"
-                    android:textSize="15sp"
+                    android:text="@string/create_network"
+                    android:textSize="16sp"
                     android:textAllCaps="false"
+                    android:backgroundTint="#2979FF"
                     app:cornerRadius="14dp"
                     app:icon="@android:drawable/ic_input_add"
                     app:iconGravity="textStart"
-                    app:iconPadding="8dp" />
+                    app:iconPadding="8dp"
+                    app:iconTint="#FFFFFF" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="or join existing"
+                    android:text="@string/or_join_existing"
                     android:textSize="12sp"
-                    android:textColor="#9E9E9E"
+                    android:textColor="#6E6E7E"
                     android:layout_gravity="center"
-                    android:layout_marginVertical="8dp" />
+                    android:layout_marginVertical="10dp" />
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
+                    android:layout_marginBottom="10dp"
                     app:boxCornerRadiusTopStart="14dp"
                     app:boxCornerRadiusTopEnd="14dp"
                     app:boxCornerRadiusBottomStart="14dp"
                     app:boxCornerRadiusBottomEnd="14dp"
-                    android:hint="Enter 6-character network ID"
-                    app:boxBackgroundMode="outline">
+                    android:hint="@string/enter_network_id"
+                    app:boxBackgroundMode="outline"
+                    app:boxStrokeColor="#3D3D5C"
+                    app:hintTextColor="#6E6E7E"
+                    android:textColorHint="#6E6E7E">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etNetworkId"
@@ -283,6 +296,7 @@
                         android:inputType="textCapCharacters"
                         android:maxLength="6"
                         android:textSize="20sp"
+                        android:textColor="#E0E0E0"
                         android:gravity="center"
                         android:fontFamily="monospace"
                         android:letterSpacing="0.3" />
@@ -293,14 +307,18 @@
                     android:id="@+id/btnJoinNetwork"
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
-                    android:text="Join Network"
-                    android:textSize="15sp"
+                    android:text="@string/join_network"
+                    android:textSize="16sp"
                     android:textAllCaps="false"
                     app:cornerRadius="14dp"
+                    app:strokeColor="#2979FF"
+                    app:strokeWidth="1dp"
+                    android:textColor="#2979FF"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     app:icon="@android:drawable/ic_menu_share"
                     app:iconGravity="textStart"
-                    app:iconPadding="8dp" />
+                    app:iconPadding="8dp"
+                    app:iconTint="#2979FF" />
 
             </LinearLayout>
 
@@ -309,187 +327,285 @@
                 android:id="@+id/btnDisconnect"
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
-                android:text="Disconnect"
-                android:textSize="15sp"
+                android:text="@string/disconnect"
+                android:textSize="16sp"
                 android:textAllCaps="false"
                 app:cornerRadius="14dp"
-                android:backgroundTint="#D32F2F"
+                android:backgroundTint="#FF5252"
                 android:visibility="gone"
-                android:layout_marginBottom="12dp"
+                android:layout_marginBottom="16dp"
                 app:icon="@android:drawable/ic_menu_close_clear_cancel"
                 app:iconGravity="textStart"
                 app:iconPadding="8dp" />
 
-            <!-- Navigation Buttons -->
-            <LinearLayout
-                android:id="@+id/layoutNavButtons"
+            <!-- Connection Methods Grid (2x3) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/method_firebase"
+                android:textSize="12sp"
+                android:textColor="#6E6E7E"
+                android:layout_marginBottom="8dp"
+                android:visibility="gone" />
+
+            <GridLayout
+                android:id="@+id/gridMethods"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="8dp">
+                android:columnCount="3"
+                android:rowCount="2"
+                android:layout_marginBottom="16dp"
+                android:useDefaultMargins="true">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnManualConnect"
+                <!-- Row 1 -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardFirebase"
                     android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:text="Manual Connect"
-                    android:textSize="11sp"
-                    android:textAllCaps="false"
-                    app:cornerRadius="12dp"
-                    android:layout_marginEnd="4dp"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                    android:layout_height="88dp"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="4dp"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="#252536"
+                    app:strokeColor="#3D3D5C"
+                    app:strokeWidth="1dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnChat"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:text="Chat"
-                    android:textSize="11sp"
-                    android:textAllCaps="false"
-                    app:cornerRadius="12dp"
-                    android:layout_marginHorizontal="4dp"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnStats"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:text="Stats"
-                    android:textSize="11sp"
-                    android:textAllCaps="false"
-                    app:cornerRadius="12dp"
-                    android:layout_marginStart="4dp"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-
-            </LinearLayout>
-
-            <!-- Second Row: Alternative Connection Methods -->
-            <LinearLayout
-                android:id="@+id/layoutNavButtons2"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="12dp">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnDirectIp"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:text="Direct IP"
-                    android:textSize="11sp"
-                    android:textAllCaps="false"
-                    app:cornerRadius="12dp"
-                    android:layout_marginEnd="4dp"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnQrConnect"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:text="Share Key"
-                    android:textSize="11sp"
-                    android:textAllCaps="false"
-                    app:cornerRadius="12dp"
-                    android:layout_marginHorizontal="4dp"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnNsdConnect"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:text="Auto Find"
-                    android:textSize="11sp"
-                    android:textAllCaps="false"
-                    app:cornerRadius="12dp"
-                    android:layout_marginStart="4dp"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-
-            </LinearLayout>
-
-            <!-- Log Panel -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardLogs"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="2dp"
-                app:cardBackgroundColor="#263238">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-
-                    <!-- Log Header -->
                     <LinearLayout
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:padding="12dp"
-                        android:gravity="center_vertical">
+                        android:layout_height="match_parent"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:padding="8dp">
 
-                        <View
-                            android:id="@+id/viewLogIndicator"
-                            android:layout_width="8dp"
-                            android:layout_height="8dp"
-                            android:background="@drawable/circle_status"
-                            android:backgroundTint="#4CAF50"
-                            android:layout_marginEnd="8dp" />
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:src="@android:drawable/ic_menu_upload"
+                            app:tint="#2979FF" />
 
                         <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Connection Log"
-                            android:textSize="13sp"
-                            android:textColor="#B0BEC5"
-                            android:textStyle="bold" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnClearLogs"
                             android:layout_width="wrap_content"
-                            android:layout_height="28dp"
-                            android:text="Clear"
-                            android:textSize="10sp"
-                            android:textColor="#78909C"
-                            style="@style/Widget.MaterialComponents.Button.TextButton"
-                            android:minWidth="0dp"
-                            android:padding="0dp"
-                            android:insetTop="0dp"
-                            android:insetBottom="0dp" />
+                            android:layout_height="wrap_content"
+                            android:text="@string/method_firebase"
+                            android:textSize="11sp"
+                            android:textColor="#E0E0E0"
+                            android:layout_marginTop="6dp"
+                            android:gravity="center" />
 
                     </LinearLayout>
 
-                    <!-- Log Content -->
-                    <androidx.core.widget.NestedScrollView
-                        android:id="@+id/scrollLogs"
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardDirectIp"
+                    android:layout_width="0dp"
+                    android:layout_height="88dp"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="4dp"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="#252536"
+                    app:strokeColor="#3D3D5C"
+                    app:strokeWidth="1dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground">
+
+                    <LinearLayout
                         android:layout_width="match_parent"
-                        android:layout_height="220dp"
-                        android:paddingHorizontal="12dp"
-                        android:paddingBottom="12dp"
-                        android:clipToPadding="false">
+                        android:layout_height="match_parent"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:padding="8dp">
+
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:src="@android:drawable/ic_menu_mapmode"
+                            app:tint="#2979FF" />
 
                         <TextView
-                            android:id="@+id/tvLogs"
-                            android:layout_width="match_parent"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:fontFamily="monospace"
+                            android:text="@string/method_direct_ip"
                             android:textSize="11sp"
-                            android:textColor="#CFD8DC"
-                            android:lineSpacingExtra="3dp"
-                            android:text="Waiting for connection..." />
+                            android:textColor="#E0E0E0"
+                            android:layout_marginTop="6dp"
+                            android:gravity="center" />
 
-                    </androidx.core.widget.NestedScrollView>
+                    </LinearLayout>
 
-                </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
-            </com.google.android.material.card.MaterialCardView>
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardShareKey"
+                    android:layout_width="0dp"
+                    android:layout_height="88dp"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="4dp"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="#252536"
+                    app:strokeColor="#3D3D5C"
+                    app:strokeWidth="1dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:padding="8dp">
+
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:src="@android:drawable/ic_menu_share"
+                            app:tint="#2979FF" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/method_share_key"
+                            android:textSize="11sp"
+                            android:textColor="#E0E0E0"
+                            android:layout_marginTop="6dp"
+                            android:gravity="center" />
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Row 2 -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardAutoFind"
+                    android:layout_width="0dp"
+                    android:layout_height="88dp"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="4dp"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="#252536"
+                    app:strokeColor="#3D3D5C"
+                    app:strokeWidth="1dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:padding="8dp">
+
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:src="@android:drawable/ic_menu_search"
+                            app:tint="#2979FF" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/method_auto_find"
+                            android:textSize="11sp"
+                            android:textColor="#E0E0E0"
+                            android:layout_marginTop="6dp"
+                            android:gravity="center" />
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardManual"
+                    android:layout_width="0dp"
+                    android:layout_height="88dp"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="4dp"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="#252536"
+                    app:strokeColor="#3D3D5C"
+                    app:strokeWidth="1dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:padding="8dp">
+
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:src="@android:drawable/ic_lock_idle_lock"
+                            app:tint="#2979FF" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/method_manual"
+                            android:textSize="11sp"
+                            android:textColor="#E0E0E0"
+                            android:layout_marginTop="6dp"
+                            android:gravity="center" />
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardSettings"
+                    android:layout_width="0dp"
+                    android:layout_height="88dp"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="4dp"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="#252536"
+                    app:strokeColor="#3D3D5C"
+                    app:strokeWidth="1dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:padding="8dp">
+
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:src="@android:drawable/ic_menu_manage"
+                            app:tint="#9E9EAE" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/method_settings"
+                            android:textSize="11sp"
+                            android:textColor="#9E9EAE"
+                            android:layout_marginTop="6dp"
+                            android:gravity="center" />
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+            </GridLayout>
 
         </LinearLayout>
 

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">P2P VPN</string>
+    <string name="app_subtitle">Виртуальная сеть</string>
+
+    <!-- Главный экран -->
+    <string name="create_network">Создать сеть</string>
+    <string name="join_network">Подключиться</string>
+    <string name="disconnect">Отключиться</string>
+    <string name="network_id">ID сети</string>
+    <string name="enter_network_id">Введите 6-символьный ID сети</string>
+    <string name="or_join_existing">или подключиться к существующей</string>
+    <string name="enter_6_chars">Введите 6 символов</string>
+    <string name="copy">Копировать</string>
+    <string name="copied">Скопировано: %s</string>
+
+    <!-- Статус -->
+    <string name="status_disconnected">Отключено</string>
+    <string name="status_connecting">Подключение…</string>
+    <string name="status_connected">Подключено</string>
+    <string name="status_waiting_peers">Ожидание пиров</string>
+    <string name="status_hint_disconnected">Нажмите чтобы создать или подключиться к сети</string>
+    <string name="status_creating">Создание сети…</string>
+    <string name="status_joining">Подключение…</string>
+    <string name="status_network_created">Сеть: %s</string>
+    <string name="status_ip_connecting">IP: %s. Подключение к пирам…</string>
+    <string name="status_connected_msg">Подключено!</string>
+    <string name="status_tunnel_active">Туннель активен!</string>
+    <string name="status_peer_disconnected">Пир отключился</string>
+    <string name="status_disconnected_msg">Отключено</string>
+    <string name="status_error">Ошибка: %s</string>
+
+    <!-- Методы подключения -->
+    <string name="method_firebase">Firebase</string>
+    <string name="method_direct_ip">Прямой IP</string>
+    <string name="method_share_key">Поделиться ключом</string>
+    <string name="method_auto_find">Авто-поиск</string>
+    <string name="method_manual">Вручную</string>
+    <string name="method_settings">Настройки</string>
+
+    <!-- Информация о сети -->
+    <string name="network_id_label">ID СЕТИ</string>
+    <string name="your_ip">Ваш IP</string>
+    <string name="peers">Пиры</string>
+
+    <!-- Настройки -->
+    <string name="settings">Настройки</string>
+    <string name="settings_display_name">Имя в сети</string>
+    <string name="settings_display_name_hint">Ваше отображаемое имя</string>
+    <string name="settings_network">Сеть</string>
+    <string name="settings_ip_prefix">Префикс виртуального IP</string>
+    <string name="settings_ip_prefix_hint">напр. 10.0.0</string>
+    <string name="settings_mtu">Размер MTU</string>
+    <string name="settings_mtu_hint">1200–1500 (по умолчанию: 1400)</string>
+    <string name="settings_servers">Серверы</string>
+    <string name="settings_enable_turn">Включить TURN-серверы</string>
+    <string name="settings_turn_hint">Необходимо для подключения из разных сетей</string>
+    <string name="settings_custom_stun">Свой STUN-сервер</string>
+    <string name="settings_custom_stun_hint">stun:сервер:порт</string>
+    <string name="settings_custom_turn">Свой TURN-сервер</string>
+    <string name="settings_custom_turn_hint">turn:сервер:порт</string>
+    <string name="settings_appearance">Внешний вид</string>
+    <string name="settings_theme">Тема</string>
+    <string name="settings_theme_dark">Тёмная</string>
+    <string name="settings_theme_light">Светлая</string>
+    <string name="settings_theme_system">Системная</string>
+    <string name="settings_logs">Логирование</string>
+    <string name="settings_show_logs">Показывать логи подключения</string>
+    <string name="settings_about">О приложении</string>
+    <string name="settings_version">Версия</string>
+    <string name="settings_github">GitHub</string>
+    <string name="settings_github_url">https://github.com</string>
+    <string name="settings_saved">Настройки сохранены</string>
+
+    <!-- VPN уведомление -->
+    <string name="vpn_notification_title">P2P VPN активен</string>
+    <string name="vpn_notification_text">Виртуальная сеть работает</string>
+
+    <!-- Разное -->
+    <string name="vpn_permission_denied">Разрешение VPN отклонено</string>
+    <string name="connection_log">Лог подключения</string>
+    <string name="clear">Очистить</string>
+    <string name="waiting_for_connection">Ожидание подключения…</string>
+    <string name="chat">Чат</string>
+    <string name="stats">Статистика</string>
+    <string name="manual_connect">Ручное подключение</string>
+    <string name="manual_mode">Ручной режим (без Firebase)</string>
+    <string name="copy_offer">Копировать ключ</string>
+    <string name="paste_answer">Вставить ответный ключ</string>
+</resources>

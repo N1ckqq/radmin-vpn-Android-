@@ -52,6 +52,10 @@
             android:name=".ui.NsdConnectActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:exported="false" />
+
         <service
             android:name=".vpn.P2PVpnService"
             android:permission="android.permission.BIND_VPN_SERVICE"

@@ -11,26 +11,21 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.VpnService
 import android.os.Bundle
-import android.text.Spannable
-import android.text.SpannableStringBuilder
-import android.text.style.ForegroundColorSpan
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import com.radminvpn.android.R
 import com.radminvpn.android.databinding.ActivityMainBinding
 import com.radminvpn.android.model.ConnectionState
-import com.radminvpn.android.model.LogLevel
-import com.radminvpn.android.util.VpnLog
+import com.radminvpn.android.model.PeerInfo
 import com.radminvpn.android.vpn.VpnOrchestrator
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
 
 class MainActivity : AppCompatActivity() {
 
@@ -39,7 +34,6 @@ class MainActivity : AppCompatActivity() {
 
     private var pendingAction: (() -> Unit)? = null
     private var pulseAnimator: AnimatorSet? = null
-    private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -48,26 +42,71 @@ class MainActivity : AppCompatActivity() {
             pendingAction?.invoke()
             pendingAction = null
         } else {
-            Toast.makeText(this, "VPN permission denied", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.vpn_permission_denied, Toast.LENGTH_SHORT).show()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        applyStoredTheme()
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        setSupportActionBar(binding.toolbar)
-
         orchestrator = VpnOrchestrator(this)
 
+        setupGrid()
         setupButtons()
         observeState()
-        observeLogs()
-        setStatusColor(Color.parseColor("#9E9E9E")) // Gray = disconnected
+        setStatusColor(Color.parseColor("#6E6E7E"))
+    }
+
+    private fun applyStoredTheme() {
+        val prefs = SettingsActivity.getPrefs(this)
+        when (prefs.getString(SettingsActivity.KEY_THEME, SettingsActivity.THEME_DARK)) {
+            SettingsActivity.THEME_DARK -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+            SettingsActivity.THEME_LIGHT -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+            SettingsActivity.THEME_SYSTEM -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+        }
+    }
+
+    private fun setupGrid() {
+        // Firebase - create/join via Firebase signaling
+        binding.cardFirebase.setOnClickListener {
+            // Already on main screen - just scroll to create/join
+            binding.layoutActions.visibility = View.VISIBLE
+        }
+
+        // Direct IP
+        binding.cardDirectIp.setOnClickListener {
+            startActivity(Intent(this, DirectIpActivity::class.java))
+        }
+
+        // Share Key
+        binding.cardShareKey.setOnClickListener {
+            startActivity(Intent(this, QrConnectActivity::class.java))
+        }
+
+        // Auto Find (NSD)
+        binding.cardAutoFind.setOnClickListener {
+            startActivity(Intent(this, NsdConnectActivity::class.java))
+        }
+
+        // Manual
+        binding.cardManual.setOnClickListener {
+            startActivity(Intent(this, ManualConnectActivity::class.java))
+        }
+
+        // Settings
+        binding.cardSettings.setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
     }
 
     private fun setupButtons() {
+        binding.btnSettingsTop.setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
+
         binding.btnCreateNetwork.setOnClickListener {
             requestVpnPermission { orchestrator.createNetwork() }
         }
@@ -75,7 +114,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnJoinNetwork.setOnClickListener {
             val networkId = binding.etNetworkId.text.toString().trim().uppercase()
             if (networkId.length != 6) {
-                binding.etNetworkId.error = "Enter 6 characters"
+                binding.etNetworkId.error = getString(R.string.enter_6_chars)
                 return@setOnClickListener
             }
             requestVpnPermission { orchestrator.joinNetwork(networkId) }
@@ -90,37 +129,8 @@ class MainActivity : AppCompatActivity() {
             if (id.isNotEmpty()) {
                 val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
                 clipboard.setPrimaryClip(ClipData.newPlainText("Network ID", id))
-                Toast.makeText(this, "Copied: $id", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.copied, id), Toast.LENGTH_SHORT).show()
             }
-        }
-
-        binding.btnClearLogs.setOnClickListener {
-            VpnLog.clear()
-            binding.tvLogs.text = ""
-        }
-
-        binding.btnManualConnect.setOnClickListener {
-            startActivity(Intent(this, ManualConnectActivity::class.java))
-        }
-
-        binding.btnChat.setOnClickListener {
-            startActivity(Intent(this, ChatActivity::class.java))
-        }
-
-        binding.btnStats.setOnClickListener {
-            startActivity(Intent(this, StatsActivity::class.java))
-        }
-
-        binding.btnDirectIp.setOnClickListener {
-            startActivity(Intent(this, DirectIpActivity::class.java))
-        }
-
-        binding.btnQrConnect.setOnClickListener {
-            startActivity(Intent(this, QrConnectActivity::class.java))
-        }
-
-        binding.btnNsdConnect.setOnClickListener {
-            startActivity(Intent(this, NsdConnectActivity::class.java))
         }
     }
 
@@ -157,60 +167,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun observeLogs() {
-        lifecycleScope.launch {
-            VpnLog.logs.collect { logs ->
-                if (logs.isEmpty()) {
-                    binding.tvLogs.text = "Waiting for connection..."
-                    return@collect
-                }
-
-                val builder = SpannableStringBuilder()
-                // Show last 50 logs
-                val recentLogs = logs.takeLast(50)
-
-                for (entry in recentLogs) {
-                    val time = timeFormat.format(Date(entry.timestamp))
-                    val prefix = when (entry.level) {
-                        LogLevel.DEBUG -> "DBG"
-                        LogLevel.INFO -> "INF"
-                        LogLevel.WARNING -> "WRN"
-                        LogLevel.ERROR -> "ERR"
-                        LogLevel.SUCCESS -> " OK"
-                    }
-                    val color = when (entry.level) {
-                        LogLevel.DEBUG -> Color.parseColor("#78909C")
-                        LogLevel.INFO -> Color.parseColor("#B0BEC5")
-                        LogLevel.WARNING -> Color.parseColor("#FFB74D")
-                        LogLevel.ERROR -> Color.parseColor("#EF5350")
-                        LogLevel.SUCCESS -> Color.parseColor("#66BB6A")
-                    }
-
-                    val line = "$time [$prefix] ${entry.message}\n"
-                    val start = builder.length
-                    builder.append(line)
-                    builder.setSpan(
-                        ForegroundColorSpan(color),
-                        start, start + line.length,
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                    )
-                }
-
-                binding.tvLogs.text = builder
-
-                // Auto-scroll to bottom
-                binding.scrollLogs.post {
-                    binding.scrollLogs.fullScroll(View.FOCUS_DOWN)
-                }
-            }
-        }
-    }
-
     private fun updateUI(state: ConnectionState) {
         when (state) {
             ConnectionState.DISCONNECTED -> {
-                binding.tvStatus.text = "Disconnected"
-                setStatusColor(Color.parseColor("#9E9E9E"))
+                binding.tvStatus.text = getString(R.string.status_disconnected)
+                binding.tvStatusMessage.text = getString(R.string.status_hint_disconnected)
+                setStatusColor(Color.parseColor("#6E6E7E"))
                 stopPulseAnimation()
 
                 showWithAnimation(binding.layoutActions)
@@ -223,7 +185,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             ConnectionState.CONNECTING -> {
-                binding.tvStatus.text = "Connecting..."
+                binding.tvStatus.text = getString(R.string.status_connecting)
                 setStatusColor(Color.parseColor("#FFC107"))
                 startPulseAnimation()
 
@@ -233,7 +195,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             ConnectionState.WAITING_FOR_PEERS -> {
-                binding.tvStatus.text = "Waiting for peers"
+                binding.tvStatus.text = getString(R.string.status_waiting_peers)
                 setStatusColor(Color.parseColor("#29B6F6"))
                 startPulseAnimation()
 
@@ -243,20 +205,20 @@ class MainActivity : AppCompatActivity() {
             }
 
             ConnectionState.CONNECTED -> {
-                binding.tvStatus.text = "Connected"
-                setStatusColor(Color.parseColor("#4CAF50"))
+                binding.tvStatus.text = getString(R.string.status_connected)
+                setStatusColor(Color.parseColor("#00E676"))
                 stopPulseAnimation()
 
                 hideWithAnimation(binding.layoutActions)
                 showWithAnimation(binding.cardNetworkInfo)
                 showWithAnimation(binding.btnDisconnect)
 
-                // Celebrate connection with a bounce
-                binding.cardStatus.animate()
-                    .scaleX(1.02f).scaleY(1.02f)
+                // Celebrate with a bounce
+                binding.viewStatusDot.animate()
+                    .scaleX(1.3f).scaleY(1.3f)
                     .setDuration(150)
                     .withEndAction {
-                        binding.cardStatus.animate()
+                        binding.viewStatusDot.animate()
                             .scaleX(1f).scaleY(1f)
                             .setDuration(150)
                             .start()
@@ -266,7 +228,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun updatePeerList(peers: List<com.radminvpn.android.model.PeerInfo>) {
+    private fun updatePeerList(peers: List<PeerInfo>) {
         binding.layoutPeers.removeAllViews()
         if (peers.isEmpty()) {
             binding.layoutPeers.isVisible = false
@@ -276,11 +238,12 @@ class MainActivity : AppCompatActivity() {
         binding.layoutPeers.isVisible = true
         for (peer in peers) {
             val tv = TextView(this).apply {
-                val statusIcon = if (peer.isConnected) "\uD83D\uDFE2" else "\u26AA"
-                text = "$statusIcon  ${peer.virtualIp}  (${peer.peerId})"
+                val statusIcon = if (peer.isConnected) "\u2B24" else "\u25CB"
+                val iconColor = if (peer.isConnected) "#00E676" else "#6E6E7E"
+                text = "$statusIcon  ${peer.virtualIp}  (${peer.peerId.take(8)})"
                 textSize = 13f
-                setTextColor(Color.parseColor("#1565C0"))
-                setPadding(0, 4, 0, 4)
+                setTextColor(Color.parseColor("#E0E0E0"))
+                setPadding(0, 6, 0, 6)
             }
             binding.layoutPeers.addView(tv)
         }
@@ -313,18 +276,18 @@ class MainActivity : AppCompatActivity() {
     private fun startPulseAnimation() {
         stopPulseAnimation()
 
-        val scaleX = ObjectAnimator.ofFloat(binding.viewPulseOuter, "scaleX", 1f, 2f).apply {
-            duration = 1200
+        val scaleX = ObjectAnimator.ofFloat(binding.viewPulseOuter, "scaleX", 1f, 2.2f).apply {
+            duration = 1400
             repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.RESTART
         }
-        val scaleY = ObjectAnimator.ofFloat(binding.viewPulseOuter, "scaleY", 1f, 2f).apply {
-            duration = 1200
+        val scaleY = ObjectAnimator.ofFloat(binding.viewPulseOuter, "scaleY", 1f, 2.2f).apply {
+            duration = 1400
             repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.RESTART
         }
-        val alpha = ObjectAnimator.ofFloat(binding.viewPulseOuter, "alpha", 0.6f, 0f).apply {
-            duration = 1200
+        val alpha = ObjectAnimator.ofFloat(binding.viewPulseOuter, "alpha", 0.5f, 0f).apply {
+            duration = 1400
             repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.RESTART
         }

@@ -1,9 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#1565C0</color>
-    <color name="primary_dark">#0D47A1</color>
-    <color name="accent">#43A047</color>
-    <color name="connected_green">#4CAF50</color>
-    <color name="disconnected_red">#F44336</color>
+    <color name="primary">#2979FF</color>
+    <color name="primary_dark">#1565C0</color>
+    <color name="accent">#00E676</color>
+    <color name="background">#121218</color>
+    <color name="surface">#1E1E2E</color>
+    <color name="card">#252536</color>
+    <color name="card_border">#3D3D5C</color>
+    <color name="text_primary">#E0E0E0</color>
+    <color name="text_secondary">#9E9EAE</color>
+    <color name="text_hint">#6E6E7E</color>
+    <color name="status_bar">#0D0D14</color>
+    <color name="connected_green">#00E676</color>
+    <color name="disconnected_gray">#6E6E7E</color>
     <color name="connecting_yellow">#FFC107</color>
+    <color name="waiting_blue">#29B6F6</color>
+    <color name="error_red">#FF5252</color>
+    <color name="divider">#2A2A3E</color>
 </resources>
