@@ -37,6 +37,17 @@
     <string name="method_auto_find">Auto Find</string>
     <string name="method_manual">Manual</string>
     <string name="method_settings">Settings</string>
+    <string name="method_servers">Servers</string>
+
+    <!-- Servers -->
+    <string name="servers_title">VPN Servers</string>
+    <string name="servers_subtitle">Tap to connect instantly</string>
+    <string name="server_connecting">Connecting to %s…</string>
+    <string name="server_connected">Connected to %s</string>
+    <string name="server_disconnected">Disconnected</string>
+    <string name="server_type_vps">VPS</string>
+    <string name="server_type_vds">VDS</string>
+    <string name="server_type_dedicated">Dedicated</string>
 
     <!-- Network info -->
     <string name="network_id_label">NETWORK ID</string>
@@ -70,7 +81,8 @@
     <string name="settings_version">Version</string>
     <string name="settings_github">GitHub</string>
     <string name="settings_github_url">https://github.com</string>
-    <string name="settings_saved">Settings saved</string>
+    <string name="settings_saved">Save Settings</string>
+    <string name="settings_saved_toast">Settings saved</string>
 
     <!-- VPN notification -->
     <string name="vpn_notification_title">P2P VPN Active</string>

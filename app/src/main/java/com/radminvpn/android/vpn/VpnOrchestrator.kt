@@ -3,6 +3,8 @@ package com.radminvpn.android.vpn
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
+import android.os.Build
+import androidx.core.content.ContextCompat
 import com.radminvpn.android.model.ConnectionState
 import com.radminvpn.android.model.PeerInfo
 import com.radminvpn.android.signaling.FirebaseSignaling
@@ -224,10 +226,15 @@ class VpnOrchestrator(private val context: Context) {
         val ip = _virtualIp.value
         if (ip.isEmpty()) return
         VpnLog.i(TAG, "Starting VPN: $ip")
-        context.startForegroundService(Intent(context, P2PVpnService::class.java).apply {
+        val intent = Intent(context, P2PVpnService::class.java).apply {
             action = P2PVpnService.ACTION_START
             putExtra(P2PVpnService.EXTRA_VIRTUAL_IP, ip)
-        })
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
+        }
         vpnStarted = true
         scope.launch {
             delay(300)
