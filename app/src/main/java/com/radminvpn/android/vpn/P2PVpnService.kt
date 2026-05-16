@@ -9,7 +9,6 @@ import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import androidx.core.app.NotificationCompat
-import com.radminvpn.android.R
 import com.radminvpn.android.ui.MainActivity
 import com.radminvpn.android.util.VpnLog
 import java.io.FileInputStream

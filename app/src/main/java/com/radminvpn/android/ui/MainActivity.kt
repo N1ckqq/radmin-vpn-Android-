@@ -16,15 +16,12 @@ import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
-import android.view.animation.AnimationUtils
-import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
-import com.radminvpn.android.R
 import com.radminvpn.android.databinding.ActivityMainBinding
 import com.radminvpn.android.model.ConnectionState
 import com.radminvpn.android.model.LogLevel
