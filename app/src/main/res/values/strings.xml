@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">P2P VPN</string>
+    <string name="create_network">Создать сеть</string>
+    <string name="join_network">Присоединиться</string>
+    <string name="disconnect">Отключиться</string>
+    <string name="network_id">ID сети</string>
+    <string name="enter_network_id">Введите ID сети</string>
+    <string name="status_disconnected">Отключено</string>
+    <string name="status_connecting">Подключение...</string>
+    <string name="status_connected">Подключено</string>
+    <string name="your_ip">Ваш IP:</string>
+    <string name="peers">Участники:</string>
+    <string name="network_created">Сеть создана!</string>
+    <string name="share_network_id">Поделитесь ID с друзьями:</string>
+    <string name="manual_mode">Ручной режим (без Firebase)</string>
+    <string name="copy_offer">Скопировать ключ</string>
+    <string name="paste_answer">Вставить ответный ключ</string>
+    <string name="vpn_notification_title">P2P VPN активен</string>
+    <string name="vpn_notification_text">Виртуальная сеть работает</string>
+</resources>
