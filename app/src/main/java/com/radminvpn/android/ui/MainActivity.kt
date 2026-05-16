@@ -345,4 +345,54 @@ class MainActivity : AppCompatActivity() {
         stopPulseAnimation()
         super.onDestroy()
     }
+
+    /**
+     * Handle incoming VPN share key - another user shared their server key with us.
+     * Key format: Base64(VPNGATE|ip|hostname|country|ovpn_config_base64)
+     */
+    fun handleSharedVpnKey(key: String): Boolean {
+        try {
+            val decoded = String(android.util.Base64.decode(key, android.util.Base64.NO_WRAP))
+            if (!decoded.startsWith("VPNGATE|")) return false
+
+            val parts = decoded.split("|", limit = 5)
+            if (parts.size < 5) return false
+
+            val ip = parts[1]
+            val hostname = parts[2]
+            val country = parts[3]
+            val configBase64 = parts[4]
+
+            // Launch the server connection
+            val intent = Intent(this, com.radminvpn.android.vpn.OpenVpnService::class.java).apply {
+                action = com.radminvpn.android.vpn.OpenVpnService.ACTION_CONNECT
+                putExtra(com.radminvpn.android.vpn.OpenVpnService.EXTRA_CONFIG_BASE64, configBase64)
+                putExtra(com.radminvpn.android.vpn.OpenVpnService.EXTRA_SERVER_NAME, hostname)
+                putExtra(com.radminvpn.android.vpn.OpenVpnService.EXTRA_SERVER_IP, ip)
+            }
+
+            val prepareIntent = VpnService.prepare(this)
+            if (prepareIntent != null) {
+                pendingAction = {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        startForegroundService(intent)
+                    } else {
+                        startService(intent)
+                    }
+                    Toast.makeText(this, "Connected to $hostname", Toast.LENGTH_SHORT).show()
+                }
+                vpnPermissionLauncher.launch(prepareIntent)
+            } else {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    startForegroundService(intent)
+                } else {
+                    startService(intent)
+                }
+                Toast.makeText(this, "Connected to $hostname", Toast.LENGTH_SHORT).show()
+            }
+            return true
+        } catch (e: Exception) {
+            return false
+        }
+    }
 }
