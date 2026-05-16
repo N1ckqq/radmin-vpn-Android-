@@ -98,6 +98,18 @@ class MainActivity : AppCompatActivity() {
             VpnLog.clear()
             binding.tvLogs.text = ""
         }
+
+        binding.btnManualConnect.setOnClickListener {
+            startActivity(Intent(this, ManualConnectActivity::class.java))
+        }
+
+        binding.btnChat.setOnClickListener {
+            startActivity(Intent(this, ChatActivity::class.java))
+        }
+
+        binding.btnStats.setOnClickListener {
+            startActivity(Intent(this, StatsActivity::class.java))
+        }
     }
 
     private fun observeState() {
