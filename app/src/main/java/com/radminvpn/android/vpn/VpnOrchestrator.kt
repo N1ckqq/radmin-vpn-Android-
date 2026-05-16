@@ -3,28 +3,28 @@ package com.radminvpn.android.vpn
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
-import android.util.Log
 import com.radminvpn.android.model.ConnectionState
 import com.radminvpn.android.model.PeerInfo
 import com.radminvpn.android.signaling.FirebaseSignaling
+import com.radminvpn.android.util.VpnLog
 import com.radminvpn.android.webrtc.WebRtcManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.webrtc.IceCandidate
-import org.webrtc.PeerConnection
+import org.webrtc.SessionDescription
 
 /**
- * Оркестратор — связывает Firebase Signaling, WebRTC и VPN сервис.
- * Управляет жизненным циклом P2P VPN соединения.
+ * Orchestrator — connects Firebase Signaling, WebRTC, and VPN Service.
+ * Properly manages per-peer WebRTC connections with ICE candidate exchange.
  */
 class VpnOrchestrator(private val context: Context) {
 
     companion object {
-        private const val TAG = "VpnOrchestrator"
+        private const val TAG = "Orchestrator"
     }
 
     private val signaling = FirebaseSignaling()
-    private var webRtcManager: WebRtcManager? = null
+    private val webRtcManager = WebRtcManager(context)
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
@@ -43,29 +43,39 @@ class VpnOrchestrator(private val context: Context) {
     val statusMessage: StateFlow<String> = _statusMessage
 
     private var currentNetworkId: String? = null
+    private var vpnStarted = false
+
+    init {
+        webRtcManager.initialize(createWebRtcListener())
+    }
 
     /**
-     * Создать новую сеть (я — хост)
+     * Create a new network (I am the host)
      */
     fun createNetwork() {
         scope.launch {
             try {
                 _connectionState.value = ConnectionState.CONNECTING
                 _statusMessage.value = "Создание сети..."
+                VpnLog.i(TAG, "Creating new network...")
 
                 val netId = signaling.createNetwork()
                 currentNetworkId = netId
                 _networkId.value = netId
                 _virtualIp.value = "10.0.0.1"
 
-                _statusMessage.value = "Сеть создана: $netId"
-                _connectionState.value = ConnectionState.CONNECTED
+                VpnLog.success(TAG, "Network created: $netId")
+                VpnLog.i(TAG, "Your virtual IP: 10.0.0.1")
+                VpnLog.i(TAG, "Waiting for peers to join...")
 
-                // Слушаем новых пиров
-                listenForNewPeers(netId)
+                _statusMessage.value = "Сеть создана! Ожидание участников..."
+                _connectionState.value = ConnectionState.WAITING_FOR_PEERS
+
+                // Start listening for peers and signaling
+                startListeners(netId)
 
             } catch (e: Exception) {
-                Log.e(TAG, "Create network failed: ${e.message}")
+                VpnLog.e(TAG, "Create network failed: ${e.message}")
                 _statusMessage.value = "Ошибка: ${e.message}"
                 _connectionState.value = ConnectionState.DISCONNECTED
             }
@@ -73,27 +83,40 @@ class VpnOrchestrator(private val context: Context) {
     }
 
     /**
-     * Присоединиться к существующей сети
+     * Join an existing network
      */
     fun joinNetwork(netId: String) {
         scope.launch {
             try {
                 _connectionState.value = ConnectionState.CONNECTING
                 _statusMessage.value = "Подключение к сети $netId..."
+                VpnLog.i(TAG, "Joining network: $netId")
 
                 val myIp = signaling.joinNetwork(netId)
                 currentNetworkId = netId
                 _networkId.value = netId
                 _virtualIp.value = myIp
 
-                _statusMessage.value = "Подключено! IP: $myIp"
+                VpnLog.success(TAG, "Joined network: $netId")
+                VpnLog.i(TAG, "Your virtual IP: $myIp")
 
-                // Инициируем WebRTC соединения с существующими пирами
-                listenForNewPeers(netId)
-                initWebRtcWithExistingPeers(netId)
+                _statusMessage.value = "В сети! IP: $myIp. Устанавливаю P2P..."
+
+                // Start listening for peers and signaling
+                startListeners(netId)
+
+                // Small delay to let peer list populate, then connect
+                delay(1500)
+
+                // Initiate connection to existing peers
+                val existingPeers = _peers.value
+                VpnLog.i(TAG, "Found ${existingPeers.size} existing peer(s)")
+                for (peer in existingPeers) {
+                    initiateP2PConnection(netId, peer.peerId)
+                }
 
             } catch (e: Exception) {
-                Log.e(TAG, "Join network failed: ${e.message}")
+                VpnLog.e(TAG, "Join network failed: ${e.message}")
                 _statusMessage.value = "Ошибка: ${e.message}"
                 _connectionState.value = ConnectionState.DISCONNECTED
             }
@@ -101,12 +124,13 @@ class VpnOrchestrator(private val context: Context) {
     }
 
     /**
-     * Слушаем новых пиров и устанавливаем с ними P2P соединение
+     * Start all Firebase listeners
      */
-    private fun listenForNewPeers(netId: String) {
+    private fun startListeners(netId: String) {
+        // Listen for new peers joining
         scope.launch {
             signaling.listenForPeers(netId).collect { peerInfo ->
-                Log.d(TAG, "New peer: ${peerInfo.peerId} (${peerInfo.virtualIp})")
+                VpnLog.i(TAG, "Peer discovered: ${peerInfo.peerId} (${peerInfo.virtualIp})")
                 val currentPeers = _peers.value.toMutableList()
                 if (currentPeers.none { it.peerId == peerInfo.peerId }) {
                     currentPeers.add(peerInfo)
@@ -115,170 +139,241 @@ class VpnOrchestrator(private val context: Context) {
             }
         }
 
-        // Слушаем входящие offers (когда к нам подключаются)
+        // Listen for incoming SDP offers (someone wants to connect to us)
         scope.launch {
             signaling.listenForOffers(netId).collect { (fromPeerId, offer) ->
-                Log.d(TAG, "Received offer from $fromPeerId")
+                VpnLog.i(TAG, "Received SDP offer from $fromPeerId")
                 handleIncomingOffer(netId, fromPeerId, offer)
             }
         }
 
-        // Слушаем ответы на наши offers
+        // Listen for SDP answers to our offers
         scope.launch {
-            signaling.listenForAnswers(netId).collect { (targetPeerId, answer) ->
-                Log.d(TAG, "Received answer from $targetPeerId")
-                handleIncomingAnswer(targetPeerId, answer)
+            signaling.listenForAnswers(netId).collect { (fromPeerId, answer) ->
+                VpnLog.i(TAG, "Received SDP answer from $fromPeerId")
+                handleIncomingAnswer(fromPeerId, answer)
+            }
+        }
+
+        // Listen for ICE candidates from all peers
+        scope.launch {
+            signaling.listenForIceCandidates(netId).collect { (fromPeerId, candidateStr) ->
+                handleIncomingIceCandidate(fromPeerId, candidateStr)
             }
         }
     }
 
     /**
-     * Подключаемся к существующим пирам в сети
+     * Initiate a P2P connection to a specific peer (we create the offer)
      */
-    private suspend fun initWebRtcWithExistingPeers(netId: String) {
-        val existingPeers = _peers.value
-        for (peer in existingPeers) {
-            initiateConnectionToPeer(netId, peer.peerId)
-        }
-    }
+    private fun initiateP2PConnection(netId: String, targetPeerId: String) {
+        VpnLog.i(TAG, "Initiating P2P connection to $targetPeerId...")
 
-    /**
-     * Инициировать WebRTC соединение с конкретным пиром
-     */
-    private fun initiateConnectionToPeer(netId: String, targetPeerId: String) {
-        val rtcManager = createWebRtcManager(netId, targetPeerId)
-        rtcManager.createPeerConnection(isInitiator = true)
+        val wrapper = webRtcManager.createConnection(targetPeerId, isInitiator = true) ?: return
 
-        rtcManager.createOffer { sdpOffer ->
+        wrapper.createOffer { sdpOffer ->
             scope.launch {
+                VpnLog.d(TAG, "Sending SDP offer to $targetPeerId")
                 signaling.sendOffer(netId, targetPeerId, sdpOffer)
             }
         }
     }
 
     /**
-     * Обработать входящий offer
+     * Handle an incoming SDP offer (we create the answer)
      */
     private fun handleIncomingOffer(netId: String, fromPeerId: String, offer: String) {
-        val rtcManager = createWebRtcManager(netId, fromPeerId)
-        rtcManager.createPeerConnection(isInitiator = false)
+        VpnLog.i(TAG, "Handling incoming offer from $fromPeerId")
 
-        rtcManager.setRemoteDescription(offer, org.webrtc.SessionDescription.Type.OFFER)
+        // Create connection as answerer
+        val wrapper = webRtcManager.createConnection(fromPeerId, isInitiator = false) ?: return
 
-        rtcManager.createAnswer { sdpAnswer ->
+        // Set remote description first
+        wrapper.setRemoteDescription(offer, SessionDescription.Type.OFFER)
+
+        // Then create answer
+        wrapper.createAnswer { sdpAnswer ->
             scope.launch {
+                VpnLog.d(TAG, "Sending SDP answer to $fromPeerId")
                 signaling.sendAnswer(netId, fromPeerId, sdpAnswer)
             }
         }
+    }
 
-        // Слушаем ICE кандидатов от этого пира
-        scope.launch {
-            signaling.listenForIceCandidates(netId, fromPeerId).collect { candidate ->
-                rtcManager.addIceCandidate(candidate)
+    /**
+     * Handle an incoming SDP answer
+     */
+    private fun handleIncomingAnswer(fromPeerId: String, answer: String) {
+        val wrapper = webRtcManager.getConnection(fromPeerId)
+        if (wrapper == null) {
+            VpnLog.w(TAG, "No connection found for peer $fromPeerId (answer)")
+            return
+        }
+        wrapper.setRemoteDescription(answer, SessionDescription.Type.ANSWER)
+    }
+
+    /**
+     * Handle an incoming ICE candidate
+     */
+    private fun handleIncomingIceCandidate(fromPeerId: String, candidateStr: String) {
+        val wrapper = webRtcManager.getConnection(fromPeerId)
+        if (wrapper == null) {
+            VpnLog.w(TAG, "No connection for peer $fromPeerId (ICE candidate) — queuing...")
+            // Retry after short delay (connection might not be ready yet)
+            scope.launch {
+                delay(500)
+                val retryWrapper = webRtcManager.getConnection(fromPeerId)
+                if (retryWrapper != null) {
+                    parseAndAddIceCandidate(retryWrapper, candidateStr)
+                } else {
+                    VpnLog.e(TAG, "Still no connection for $fromPeerId, dropping ICE candidate")
+                }
             }
+            return
+        }
+        parseAndAddIceCandidate(wrapper, candidateStr)
+    }
+
+    private fun parseAndAddIceCandidate(
+        wrapper: WebRtcManager.PeerConnectionWrapper,
+        candidateStr: String
+    ) {
+        try {
+            val parts = candidateStr.split("|", limit = 3)
+            if (parts.size == 3) {
+                wrapper.addIceCandidate(parts[0], parts[1].toInt(), parts[2])
+            } else {
+                VpnLog.e(TAG, "Malformed ICE candidate: $candidateStr")
+            }
+        } catch (e: Exception) {
+            VpnLog.e(TAG, "Failed to parse ICE candidate: ${e.message}")
         }
     }
 
     /**
-     * Обработать ответ на наш offer
+     * Create WebRTC listener that handles events for all peer connections
      */
-    private fun handleIncomingAnswer(targetPeerId: String, answer: String) {
-        webRtcManager?.setRemoteDescription(answer, org.webrtc.SessionDescription.Type.ANSWER)
-    }
-
-    /**
-     * Создать WebRTC менеджер с привязкой к VPN
-     */
-    private fun createWebRtcManager(netId: String, remotePeerId: String): WebRtcManager {
-        val manager = WebRtcManager(context, object : WebRtcManager.WebRtcListener {
-            override fun onIceCandidate(candidate: IceCandidate) {
+    private fun createWebRtcListener(): WebRtcManager.Listener {
+        return object : WebRtcManager.Listener {
+            override fun onIceCandidate(peerId: String, candidate: IceCandidate) {
                 val candidateStr = "${candidate.sdpMid}|${candidate.sdpMLineIndex}|${candidate.sdp}"
                 scope.launch {
-                    signaling.sendIceCandidate(netId, remotePeerId, candidateStr)
+                    val netId = currentNetworkId ?: return@launch
+                    signaling.sendIceCandidate(netId, peerId, candidateStr)
                 }
             }
 
-            override fun onDataChannelMessage(data: ByteArray) {
-                // Пакет получен от удалённого пира → записать в TUN
+            override fun onDataChannelMessage(peerId: String, data: ByteArray) {
+                // Received packet from remote peer → write to TUN
                 P2PVpnService.instance?.writePacket(data)
             }
 
-            override fun onConnectionStateChanged(state: PeerConnection.IceConnectionState) {
-                when (state) {
-                    PeerConnection.IceConnectionState.CONNECTED -> {
-                        _connectionState.value = ConnectionState.CONNECTED
-                        _statusMessage.value = "P2P соединение установлено!"
-                        startVpnService()
-                    }
-                    PeerConnection.IceConnectionState.DISCONNECTED,
-                    PeerConnection.IceConnectionState.FAILED -> {
-                        _statusMessage.value = "Соединение потеряно"
-                    }
-                    else -> {}
+            override fun onPeerConnected(peerId: String) {
+                _connectionState.value = ConnectionState.CONNECTED
+                _statusMessage.value = "P2P соединение установлено!"
+                VpnLog.success(TAG, "Connected to peer: $peerId")
+
+                // Update peer status
+                updatePeerConnectionStatus(peerId, true)
+
+                // Start VPN service if not already started
+                if (!vpnStarted) {
+                    startVpnService()
                 }
             }
 
-            override fun onDataChannelOpen() {
-                Log.d(TAG, "DataChannel OPEN — туннель активен")
+            override fun onPeerDisconnected(peerId: String) {
+                VpnLog.w(TAG, "Peer disconnected: $peerId")
+                updatePeerConnectionStatus(peerId, false)
+
+                // Check if all peers are disconnected
+                val anyConnected = _peers.value.any { it.isConnected }
+                if (!anyConnected && vpnStarted) {
+                    _statusMessage.value = "Все пиры отключены"
+                }
+            }
+
+            override fun onDataChannelOpen(peerId: String) {
+                VpnLog.success(TAG, "Tunnel OPEN with $peerId — data can flow!")
                 _statusMessage.value = "Туннель активен!"
             }
 
-            override fun onDataChannelClose() {
-                Log.d(TAG, "DataChannel CLOSED")
+            override fun onDataChannelClose(peerId: String) {
+                VpnLog.w(TAG, "Tunnel CLOSED with $peerId")
             }
-        })
+        }
+    }
 
-        webRtcManager = manager
-        return manager
+    private fun updatePeerConnectionStatus(peerId: String, connected: Boolean) {
+        val updated = _peers.value.map { peer ->
+            if (peer.peerId == peerId) peer.copy(isConnected = connected) else peer
+        }
+        _peers.value = updated
     }
 
     /**
-     * Запустить VPN сервис
+     * Start VPN service (TUN interface)
      */
     private fun startVpnService() {
         val myIp = _virtualIp.value
-        val peerIp = _peers.value.firstOrNull()?.virtualIp ?: "10.0.0.2"
+        if (myIp.isEmpty()) return
+
+        VpnLog.i(TAG, "Starting VPN service with IP: $myIp")
 
         val intent = Intent(context, P2PVpnService::class.java).apply {
             action = P2PVpnService.ACTION_START
             putExtra(P2PVpnService.EXTRA_VIRTUAL_IP, myIp)
-            putExtra(P2PVpnService.EXTRA_PEER_VIRTUAL_IP, peerIp)
         }
         context.startForegroundService(intent)
 
-        // Привязать чтение из TUN к отправке через WebRTC
-        P2PVpnService.instance?.onPacketReceived = { packet ->
-            webRtcManager?.sendPacket(packet)
+        vpnStarted = true
+
+        // Connect TUN output to WebRTC
+        scope.launch {
+            delay(500) // Wait for service to start
+            P2PVpnService.instance?.onPacketReceived = { packet ->
+                webRtcManager.sendPacketToAll(packet)
+            }
+            VpnLog.success(TAG, "VPN tunnel connected to WebRTC")
         }
     }
 
     /**
-     * Отключиться от сети
+     * Disconnect from the network
      */
     fun disconnect() {
         scope.launch {
-            currentNetworkId?.let { signaling.leaveNetwork(it) }
+            VpnLog.i(TAG, "Disconnecting...")
 
+            currentNetworkId?.let {
+                try {
+                    signaling.leaveNetwork(it)
+                } catch (e: Exception) {
+                    VpnLog.w(TAG, "Leave network error: ${e.message}")
+                }
+            }
+
+            // Stop VPN
             val intent = Intent(context, P2PVpnService::class.java).apply {
                 action = P2PVpnService.ACTION_STOP
             }
             context.startService(intent)
 
-            webRtcManager?.dispose()
-            webRtcManager = null
+            // Close all WebRTC connections
+            webRtcManager.dispose()
 
+            vpnStarted = false
             _connectionState.value = ConnectionState.DISCONNECTED
             _virtualIp.value = ""
             _networkId.value = ""
             _peers.value = emptyList()
             _statusMessage.value = "Отключено"
             currentNetworkId = null
+
+            VpnLog.i(TAG, "Disconnected successfully")
         }
     }
 
-    /**
-     * Проверить, готов ли VPN (есть ли разрешение)
-     */
     fun prepareVpn(): Intent? {
         return VpnService.prepare(context)
     }

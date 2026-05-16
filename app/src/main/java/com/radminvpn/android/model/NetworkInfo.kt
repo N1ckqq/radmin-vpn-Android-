@@ -11,13 +11,27 @@ data class PeerInfo(
     val peerId: String = "",
     val virtualIp: String = "",
     val joinedAt: Long = 0,
-    val offer: String = "",
-    val answer: String = "",
-    val iceCandidates: List<String> = emptyList()
+    val isConnected: Boolean = false
 )
 
 enum class ConnectionState {
     DISCONNECTED,
     CONNECTING,
+    WAITING_FOR_PEERS,
     CONNECTED
+}
+
+data class LogEntry(
+    val timestamp: Long = System.currentTimeMillis(),
+    val level: LogLevel = LogLevel.INFO,
+    val tag: String = "",
+    val message: String = ""
+)
+
+enum class LogLevel {
+    DEBUG,
+    INFO,
+    WARNING,
+    ERROR,
+    SUCCESS
 }

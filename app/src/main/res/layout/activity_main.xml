@@ -1,170 +1,406 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:background="#F5F5F5">
 
-    <LinearLayout
+    <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp"
-        android:gravity="center_horizontal">
+        android:elevation="0dp"
+        app:elevation="0dp">
 
-        <!-- Заголовок -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="P2P VPN"
-            android:textSize="28sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorPrimary"
-            android:layout_marginTop="16dp" />
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="?attr/colorPrimary"
+            app:title="P2P VPN"
+            app:titleTextColor="#FFFFFF"
+            app:subtitle="Virtual LAN"
+            app:subtitleTextColor="#B3FFFFFF" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Виртуальная локальная сеть"
-            android:textSize="14sp"
-            android:textColor="?android:textColorSecondary"
-            android:layout_marginBottom="32dp" />
+    </com.google.android.material.appbar.AppBarLayout>
 
-        <!-- Статус -->
-        <com.google.android.material.card.MaterialCardView
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp">
+            android:orientation="vertical"
+            android:padding="16dp">
 
+            <!-- Status Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="2dp"
+                app:strokeWidth="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:padding="20dp"
+                    android:gravity="center_vertical">
+
+                    <!-- Animated status indicator -->
+                    <FrameLayout
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_marginEnd="16dp">
+
+                        <View
+                            android:id="@+id/viewPulseOuter"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:background="@drawable/circle_pulse"
+                            android:layout_gravity="center"
+                            android:alpha="0.3" />
+
+                        <View
+                            android:id="@+id/viewStatusDot"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:background="@drawable/circle_status"
+                            android:layout_gravity="center" />
+
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Disconnected"
+                            android:textSize="18sp"
+                            android:textStyle="bold"
+                            android:textColor="#212121" />
+
+                        <TextView
+                            android:id="@+id/tvStatusMessage"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Tap to create or join a network"
+                            android:textSize="13sp"
+                            android:textColor="#757575"
+                            android:layout_marginTop="2dp" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Network Info Card (visible when connected) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardNetworkInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:visibility="gone"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="#E3F2FD">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Network ID"
+                            android:textSize="12sp"
+                            android:textColor="#1565C0"
+                            android:textAllCaps="true"
+                            android:letterSpacing="0.1" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnCopyId"
+                            android:layout_width="wrap_content"
+                            android:layout_height="32dp"
+                            android:text="Copy"
+                            android:textSize="11sp"
+                            app:cornerRadius="16dp"
+                            style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvNetworkId"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text=""
+                        android:textSize="28sp"
+                        android:textStyle="bold"
+                        android:textColor="#0D47A1"
+                        android:fontFamily="monospace"
+                        android:letterSpacing="0.3" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#1565C0"
+                        android:alpha="0.2"
+                        android:layout_marginVertical="12dp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Your IP"
+                                android:textSize="11sp"
+                                android:textColor="#1565C0" />
+
+                            <TextView
+                                android:id="@+id/tvVirtualIp"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="10.0.0.1"
+                                android:textSize="16sp"
+                                android:textStyle="bold"
+                                android:textColor="#212121"
+                                android:fontFamily="monospace" />
+
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Peers"
+                                android:textSize="11sp"
+                                android:textColor="#1565C0" />
+
+                            <TextView
+                                android:id="@+id/tvPeerCount"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0"
+                                android:textSize="16sp"
+                                android:textStyle="bold"
+                                android:textColor="#212121" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                    <!-- Peer List -->
+                    <LinearLayout
+                        android:id="@+id/layoutPeers"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginTop="8dp"
+                        android:visibility="gone" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Action Buttons (visible when disconnected) -->
             <LinearLayout
+                android:id="@+id/layoutActions"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:layout_marginBottom="12dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCreateNetwork"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="Create Network"
+                    android:textSize="15sp"
+                    android:textAllCaps="false"
+                    app:cornerRadius="14dp"
+                    app:icon="@android:drawable/ic_input_add"
+                    app:iconGravity="textStart"
+                    app:iconPadding="8dp" />
 
                 <TextView
-                    android:id="@+id/tvStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/status_disconnected"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:drawablePadding="8dp" />
-
-                <TextView
-                    android:id="@+id/tvVirtualIp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text=""
-                    android:textSize="14sp"
-                    android:layout_marginTop="4dp"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/tvNetworkId"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text=""
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:layout_marginTop="4dp"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/tvStatusMessage"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:text="or join existing"
                     android:textSize="12sp"
-                    android:textColor="?android:textColorSecondary"
-                    android:layout_marginTop="4dp" />
+                    android:textColor="#9E9E9E"
+                    android:layout_gravity="center"
+                    android:layout_marginVertical="8dp" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    app:boxCornerRadiusTopStart="14dp"
+                    app:boxCornerRadiusTopEnd="14dp"
+                    app:boxCornerRadiusBottomStart="14dp"
+                    app:boxCornerRadiusBottomEnd="14dp"
+                    android:hint="Enter 6-character network ID"
+                    app:boxBackgroundMode="outline">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etNetworkId"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textCapCharacters"
+                        android:maxLength="6"
+                        android:textSize="20sp"
+                        android:gravity="center"
+                        android:fontFamily="monospace"
+                        android:letterSpacing="0.3" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnJoinNetwork"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="Join Network"
+                    android:textSize="15sp"
+                    android:textAllCaps="false"
+                    app:cornerRadius="14dp"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    app:icon="@android:drawable/ic_menu_share"
+                    app:iconGravity="textStart"
+                    app:iconPadding="8dp" />
 
             </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
 
-        <!-- Кнопка создать сеть -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnCreateNetwork"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:text="@string/create_network"
-            android:textSize="16sp"
-            app:cornerRadius="12dp"
-            android:layout_marginBottom="12dp" />
+            <!-- Disconnect Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDisconnect"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Disconnect"
+                android:textSize="15sp"
+                android:textAllCaps="false"
+                app:cornerRadius="14dp"
+                android:backgroundTint="#D32F2F"
+                android:visibility="gone"
+                android:layout_marginBottom="12dp"
+                app:icon="@android:drawable/ic_menu_close_clear_cancel"
+                app:iconGravity="textStart"
+                app:iconPadding="8dp" />
 
-        <!-- Или -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="или"
-            android:textColor="?android:textColorSecondary"
-            android:layout_marginBottom="12dp" />
-
-        <!-- Поле ввода ID сети -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            app:boxCornerRadiusTopStart="12dp"
-            app:boxCornerRadiusTopEnd="12dp"
-            app:boxCornerRadiusBottomStart="12dp"
-            app:boxCornerRadiusBottomEnd="12dp"
-            android:hint="@string/enter_network_id">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etNetworkId"
+            <!-- Log Panel -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardLogs"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textCapCharacters"
-                android:maxLength="6"
-                android:textSize="18sp"
-                android:gravity="center"
-                android:letterSpacing="0.2" />
+                app:cardCornerRadius="16dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="#263238">
 
-        </com.google.android.material.textfield.TextInputLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
 
-        <!-- Кнопка присоединиться -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnJoinNetwork"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:text="@string/join_network"
-            android:textSize="16sp"
-            app:cornerRadius="12dp"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_marginBottom="24dp" />
+                    <!-- Log Header -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:padding="12dp"
+                        android:gravity="center_vertical">
 
-        <!-- Кнопка отключиться (скрыта по умолчанию) -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnDisconnect"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:text="@string/disconnect"
-            android:textSize="16sp"
-            app:cornerRadius="12dp"
-            android:backgroundTint="#D32F2F"
-            android:visibility="gone"
-            android:layout_marginBottom="24dp" />
+                        <View
+                            android:id="@+id/viewLogIndicator"
+                            android:layout_width="8dp"
+                            android:layout_height="8dp"
+                            android:background="@drawable/circle_status"
+                            android:backgroundTint="#4CAF50"
+                            android:layout_marginEnd="8dp" />
 
-        <!-- Список пиров -->
-        <TextView
-            android:id="@+id/tvPeersTitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/peers"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:visibility="gone" />
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Connection Log"
+                            android:textSize="13sp"
+                            android:textColor="#B0BEC5"
+                            android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/tvPeersList"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="13sp"
-            android:fontFamily="monospace"
-            android:layout_marginTop="8dp"
-            android:visibility="gone" />
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnClearLogs"
+                            android:layout_width="wrap_content"
+                            android:layout_height="28dp"
+                            android:text="Clear"
+                            android:textSize="10sp"
+                            android:textColor="#78909C"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
+                            android:minWidth="0dp"
+                            android:padding="0dp"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp" />
 
-    </LinearLayout>
-</ScrollView>
+                    </LinearLayout>
+
+                    <!-- Log Content -->
+                    <androidx.core.widget.NestedScrollView
+                        android:id="@+id/scrollLogs"
+                        android:layout_width="match_parent"
+                        android:layout_height="220dp"
+                        android:paddingHorizontal="12dp"
+                        android:paddingBottom="12dp"
+                        android:clipToPadding="false">
+
+                        <TextView
+                            android:id="@+id/tvLogs"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="monospace"
+                            android:textSize="11sp"
+                            android:textColor="#CFD8DC"
+                            android:lineSpacingExtra="3dp"
+                            android:text="Waiting for connection..." />
+
+                    </androidx.core.widget.NestedScrollView>
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+
+    </androidx.core.widget.NestedScrollView>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

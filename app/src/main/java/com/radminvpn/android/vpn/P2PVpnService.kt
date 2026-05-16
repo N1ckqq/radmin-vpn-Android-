@@ -8,29 +8,29 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.radminvpn.android.R
 import com.radminvpn.android.ui.MainActivity
+import com.radminvpn.android.util.VpnLog
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /**
- * VPN сервис - создаёт TUN интерфейс и маршрутизирует
- * IP-пакеты через WebRTC DataChannel.
+ * VPN Service — creates TUN interface and routes IP packets through WebRTC.
  */
 class P2PVpnService : VpnService() {
 
     companion object {
-        private const val TAG = "P2PVpnService"
+        private const val TAG = "VpnService"
         private const val CHANNEL_ID = "p2p_vpn_channel"
         private const val NOTIFICATION_ID = 1
 
         const val ACTION_START = "com.radminvpn.android.START_VPN"
         const val ACTION_STOP = "com.radminvpn.android.STOP_VPN"
         const val EXTRA_VIRTUAL_IP = "virtual_ip"
-        const val EXTRA_PEER_VIRTUAL_IP = "peer_virtual_ip"
 
         var instance: P2PVpnService? = null
             private set
@@ -38,23 +38,29 @@ class P2PVpnService : VpnService() {
 
     private var vpnInterface: ParcelFileDescriptor? = null
     private var tunReadThread: Thread? = null
-    private var isRunning = false
+    private val isRunning = AtomicBoolean(false)
 
-    // Callback для отправки пакетов через WebRTC
+    // Stats
+    val packetsSent = AtomicLong(0)
+    val packetsReceived = AtomicLong(0)
+    val bytesSent = AtomicLong(0)
+    val bytesReceived = AtomicLong(0)
+
+    // Callback for sending packets through WebRTC
     var onPacketReceived: ((ByteArray) -> Unit)? = null
 
     override fun onCreate() {
         super.onCreate()
         instance = this
         createNotificationChannel()
+        VpnLog.i(TAG, "VPN Service created")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
                 val virtualIp = intent.getStringExtra(EXTRA_VIRTUAL_IP) ?: "10.0.0.1"
-                val peerVirtualIp = intent.getStringExtra(EXTRA_PEER_VIRTUAL_IP) ?: "10.0.0.2"
-                startVpn(virtualIp, peerVirtualIp)
+                startVpn(virtualIp)
             }
             ACTION_STOP -> {
                 stopVpn()
@@ -69,61 +75,69 @@ class P2PVpnService : VpnService() {
         super.onDestroy()
     }
 
-    /**
-     * Запустить VPN — создать TUN интерфейс
-     */
-    private fun startVpn(virtualIp: String, peerVirtualIp: String) {
-        if (isRunning) return
-
-        startForeground(NOTIFICATION_ID, buildNotification())
-
-        // Создаём TUN интерфейс
-        val builder = Builder()
-            .setSession("P2P VPN")
-            .addAddress(virtualIp, 24) // 10.0.0.x/24
-            .addRoute("10.0.0.0", 24) // Маршрутизировать только виртуальную подсеть
-            .setMtu(1400) // Оставляем место для WebRTC overhead
-            .setBlocking(true)
-
-        // Не перехватываем весь трафик — только виртуальную подсеть
-        vpnInterface = builder.establish()
-
-        if (vpnInterface == null) {
-            Log.e(TAG, "Failed to establish VPN interface")
-            stopSelf()
+    private fun startVpn(virtualIp: String) {
+        if (isRunning.get()) {
+            VpnLog.w(TAG, "VPN already running")
             return
         }
 
-        isRunning = true
-        startTunReader()
+        VpnLog.i(TAG, "Starting VPN with IP: $virtualIp")
+        startForeground(NOTIFICATION_ID, buildNotification(virtualIp))
 
-        Log.i(TAG, "VPN started with IP: $virtualIp, peer: $peerVirtualIp")
+        try {
+            val builder = Builder()
+                .setSession("P2P VPN")
+                .addAddress(virtualIp, 24)
+                .addRoute("10.0.0.0", 24)
+                .setMtu(1400)
+                .setBlocking(true)
+
+            vpnInterface = builder.establish()
+
+            if (vpnInterface == null) {
+                VpnLog.e(TAG, "Failed to establish VPN interface")
+                stopSelf()
+                return
+            }
+
+            isRunning.set(true)
+            startTunReader()
+
+            VpnLog.success(TAG, "VPN interface established! IP: $virtualIp/24")
+            VpnLog.i(TAG, "Routing 10.0.0.0/24 through tunnel")
+        } catch (e: Exception) {
+            VpnLog.e(TAG, "VPN start error: ${e.message}")
+            stopSelf()
+        }
     }
 
-    /**
-     * Читать пакеты из TUN интерфейса и отправлять через WebRTC
-     */
     private fun startTunReader() {
         tunReadThread = Thread {
-            val input = FileInputStream(vpnInterface!!.fileDescriptor)
+            val fd = vpnInterface?.fileDescriptor ?: return@Thread
+            val input = FileInputStream(fd)
             val buffer = ByteBuffer.allocate(1500)
 
+            VpnLog.d(TAG, "TUN reader thread started")
+
             try {
-                while (isRunning) {
+                while (isRunning.get()) {
                     buffer.clear()
                     val length = input.read(buffer.array())
                     if (length > 0) {
                         val packet = ByteArray(length)
                         System.arraycopy(buffer.array(), 0, packet, 0, length)
-                        // Отправить пакет через WebRTC DataChannel
+                        packetsSent.incrementAndGet()
+                        bytesSent.addAndGet(length.toLong())
                         onPacketReceived?.invoke(packet)
                     }
                 }
             } catch (e: Exception) {
-                if (isRunning) {
-                    Log.e(TAG, "TUN read error: ${e.message}")
+                if (isRunning.get()) {
+                    VpnLog.e(TAG, "TUN read error: ${e.message}")
                 }
             }
+
+            VpnLog.d(TAG, "TUN reader thread stopped")
         }.apply {
             name = "TUN-Reader"
             isDaemon = true
@@ -132,23 +146,27 @@ class P2PVpnService : VpnService() {
     }
 
     /**
-     * Записать входящий пакет в TUN интерфейс
-     * (пакет получен от удалённого пира через WebRTC)
+     * Write incoming packet to TUN (received from remote peer via WebRTC)
      */
     fun writePacket(data: ByteArray) {
         try {
-            val output = FileOutputStream(vpnInterface?.fileDescriptor ?: return)
+            val fd = vpnInterface?.fileDescriptor ?: return
+            val output = FileOutputStream(fd)
             output.write(data)
+            packetsReceived.incrementAndGet()
+            bytesReceived.addAndGet(data.size.toLong())
         } catch (e: Exception) {
-            Log.e(TAG, "TUN write error: ${e.message}")
+            VpnLog.e(TAG, "TUN write error: ${e.message}")
         }
     }
 
-    /**
-     * Остановить VPN
-     */
     private fun stopVpn() {
-        isRunning = false
+        if (!isRunning.getAndSet(false)) return
+
+        VpnLog.i(TAG, "Stopping VPN...")
+        VpnLog.i(TAG, "Stats: sent=${packetsSent.get()} pkts (${bytesSent.get()} B), " +
+                "recv=${packetsReceived.get()} pkts (${bytesReceived.get()} B)")
+
         tunReadThread?.interrupt()
         tunReadThread = null
 
@@ -158,10 +176,10 @@ class P2PVpnService : VpnService() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
 
-        Log.i(TAG, "VPN stopped")
+        VpnLog.i(TAG, "VPN stopped")
     }
 
-    private fun buildNotification(): Notification {
+    private fun buildNotification(ip: String = ""): Notification {
         val intent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
             this, 0, intent,
@@ -169,8 +187,8 @@ class P2PVpnService : VpnService() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.vpn_notification_title))
-            .setContentText(getString(R.string.vpn_notification_text))
+            .setContentTitle("P2P VPN Active")
+            .setContentText("Virtual IP: $ip")
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
