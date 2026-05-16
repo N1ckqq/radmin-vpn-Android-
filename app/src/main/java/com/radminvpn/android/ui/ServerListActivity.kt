@@ -1,6 +1,8 @@
 package com.radminvpn.android.ui
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
@@ -10,9 +12,8 @@ import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
-import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,17 +22,11 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.radminvpn.android.R
 import com.radminvpn.android.databinding.ActivityServerListBinding
-import com.radminvpn.android.model.BuiltInServers
-import com.radminvpn.android.model.ServerConfig
-import com.radminvpn.android.model.ServerType
+import com.radminvpn.android.model.VpnGateServer
 import com.radminvpn.android.util.VpnLog
-import com.radminvpn.android.vpn.P2PVpnService
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import com.radminvpn.android.vpn.OpenVpnService
+import com.radminvpn.android.vpn.VpnGateRepository
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.net.InetSocketAddress
-import java.net.Socket
 
 class ServerListActivity : AppCompatActivity() {
 
@@ -40,8 +35,8 @@ class ServerListActivity : AppCompatActivity() {
     }
 
     private lateinit var binding: ActivityServerListBinding
-    private var connectedServerId: String? = null
-    private var pendingServer: ServerConfig? = null
+    private var servers: List<VpnGateServer> = emptyList()
+    private var pendingServer: VpnGateServer? = null
 
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -63,23 +58,91 @@ class ServerListActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener { finish() }
         binding.btnDisconnect.setOnClickListener { disconnectFromServer() }
 
-        val servers = BuiltInServers.servers
-        binding.tvServerCount.text = "${servers.size} servers"
-
-        buildServerList(servers)
         checkCurrentConnection()
-
-        VpnLog.i(TAG, "Server list opened. ${servers.size} servers available.")
+        loadServers()
     }
 
-    private fun buildServerList(servers: List<ServerConfig>) {
+    private fun loadServers() {
+        // Show loading
+        binding.layoutServers.removeAllViews()
+        val loading = ProgressBar(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.CENTER
+                topMargin = (48 * resources.displayMetrics.density).toInt()
+            }
+        }
+        binding.layoutServers.addView(loading)
+
+        val loadingText = TextView(this).apply {
+            text = "Loading VPN Gate servers..."
+            textSize = 14f
+            setTextColor(Color.parseColor("#9E9EAE"))
+            gravity = Gravity.CENTER
+            setPadding(0, (16 * resources.displayMetrics.density).toInt(), 0, 0)
+        }
+        binding.layoutServers.addView(loadingText)
+
+        lifecycleScope.launch {
+            val result = VpnGateRepository.fetchServers()
+            binding.layoutServers.removeAllViews()
+
+            result.fold(
+                onSuccess = { serverList ->
+                    servers = serverList
+                    binding.tvServerCount.text = "${serverList.size} servers online"
+                    buildServerList(serverList)
+                    VpnLog.success(TAG, "Loaded ${serverList.size} servers from VPN Gate")
+                },
+                onFailure = { error ->
+                    showError("Failed to load servers: ${error.message}")
+                    VpnLog.e(TAG, "Failed to load: ${error.message}")
+                }
+            )
+        }
+    }
+
+    private fun showError(message: String) {
+        val errorView = TextView(this).apply {
+            text = message
+            textSize = 14f
+            setTextColor(Color.parseColor("#FF5252"))
+            gravity = Gravity.CENTER
+            setPadding(
+                (32 * resources.displayMetrics.density).toInt(),
+                (48 * resources.displayMetrics.density).toInt(),
+                (32 * resources.displayMetrics.density).toInt(),
+                (16 * resources.displayMetrics.density).toInt()
+            )
+        }
+        binding.layoutServers.addView(errorView)
+
+        val retryBtn = com.google.android.material.button.MaterialButton(this).apply {
+            text = "Retry"
+            setOnClickListener { loadServers() }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { gravity = Gravity.CENTER_HORIZONTAL }
+        }
+        binding.layoutServers.addView(retryBtn)
+    }
+
+    private fun buildServerList(servers: List<VpnGateServer>) {
         val density = resources.displayMetrics.density
-        val grouped = servers.groupBy { it.country }
+        val grouped = servers.groupBy { it.countryLong }
+            .toSortedMap()
+            .entries
+            .sortedByDescending { it.value.sumOf { s -> s.score } }
 
         for ((country, countryServers) in grouped) {
+            val flag = countryServers.first().countryFlag
+
             // Country header
             val header = TextView(this).apply {
-                text = "${countryServers.first().countryFlag}  $country"
+                text = "$flag  $country (${countryServers.size})"
                 textSize = 14f
                 setTextColor(Color.parseColor("#2979FF"))
                 typeface = Typeface.DEFAULT_BOLD
@@ -87,22 +150,33 @@ class ServerListActivity : AppCompatActivity() {
             }
             binding.layoutServers.addView(header)
 
-            for (server in countryServers) {
+            // Show top 5 servers per country to avoid overwhelming UI
+            for (server in countryServers.take(5)) {
                 val card = createServerCard(server, density)
                 binding.layoutServers.addView(card)
+            }
+
+            if (countryServers.size > 5) {
+                val moreText = TextView(this).apply {
+                    text = "  +${countryServers.size - 5} more servers"
+                    textSize = 12f
+                    setTextColor(Color.parseColor("#6E6E7E"))
+                    setPadding(0, 0, 0, (8 * density).toInt())
+                }
+                binding.layoutServers.addView(moreText)
             }
         }
     }
 
-    private fun createServerCard(server: ServerConfig, density: Float): View {
+    private fun createServerCard(server: VpnGateServer, density: Float): View {
         val card = com.google.android.material.card.MaterialCardView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                bottomMargin = (8 * density).toInt()
+                bottomMargin = (6 * density).toInt()
             }
-            radius = 14 * density
+            radius = 12 * density
             cardElevation = 0f
             setCardBackgroundColor(Color.parseColor("#252536"))
             strokeColor = Color.parseColor("#3D3D5C")
@@ -116,24 +190,26 @@ class ServerListActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(
-                (16 * density).toInt(),
                 (14 * density).toInt(),
-                (16 * density).toInt(),
-                (14 * density).toInt()
+                (12 * density).toInt(),
+                (14 * density).toInt(),
+                (12 * density).toInt()
             )
         }
 
-        // Status dot
+        // Speed indicator dot (green = fast, yellow = medium, red = slow)
+        val speedColor = when {
+            server.speedMbps > 50 -> "#4CAF50"
+            server.speedMbps > 10 -> "#FFC107"
+            else -> "#FF5252"
+        }
         val statusDot = View(this).apply {
             layoutParams = LinearLayout.LayoutParams(
-                (10 * density).toInt(),
-                (10 * density).toInt()
-            ).apply {
-                marginEnd = (12 * density).toInt()
-            }
+                (8 * density).toInt(), (8 * density).toInt()
+            ).apply { marginEnd = (10 * density).toInt() }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#4CAF50"))
+                setColor(Color.parseColor(speedColor))
             }
         }
         content.addView(statusDot)
@@ -145,20 +221,16 @@ class ServerListActivity : AppCompatActivity() {
         }
 
         val nameView = TextView(this).apply {
-            text = server.name
-            textSize = 15f
+            text = "${server.hostName}"
+            textSize = 13f
             setTextColor(Color.parseColor("#E0E0E0"))
             typeface = Typeface.DEFAULT_BOLD
+            maxLines = 1
         }
         infoLayout.addView(nameView)
 
         val detailView = TextView(this).apply {
-            val typeLabel = when (server.type) {
-                ServerType.VPS -> "VPS"
-                ServerType.VDS -> "VDS"
-                ServerType.DEDICATED -> "Dedicated"
-            }
-            text = "$typeLabel • ${server.protocol} • ${server.host}:${server.port}"
+            text = "${String.format("%.1f", server.speedMbps)} Mbps • ${server.ping}ms • ${server.numVpnSessions} users"
             textSize = 11f
             setTextColor(Color.parseColor("#9E9EAE"))
         }
@@ -166,35 +238,32 @@ class ServerListActivity : AppCompatActivity() {
 
         content.addView(infoLayout)
 
-        // Connect button indicator
+        // Connect arrow
         val connectIcon = TextView(this).apply {
-            text = "\u25B6" // Play triangle
-            textSize = 20f
+            text = "\u25B6"
+            textSize = 16f
             setTextColor(Color.parseColor("#2979FF"))
             gravity = Gravity.CENTER
         }
         content.addView(connectIcon)
 
         card.addView(content)
-        card.tag = server.id
         return card
     }
 
-    private fun onServerClicked(server: ServerConfig) {
-        if (connectedServerId == server.id) {
-            // Already connected to this server
-            Toast.makeText(this, "Already connected to ${server.name}", Toast.LENGTH_SHORT).show()
+    private fun onServerClicked(server: VpnGateServer) {
+        if (OpenVpnService.isConnected && OpenVpnService.currentServerIp == server.ip) {
+            // Already connected - show share dialog
+            showShareKeyDialog(server)
             return
         }
 
-        if (connectedServerId != null) {
-            // Disconnect from current first
+        if (OpenVpnService.isConnected) {
             disconnectFromServer()
         }
 
-        VpnLog.i(TAG, "Connecting to ${server.name} (${server.host}:${server.port})...")
+        VpnLog.i(TAG, "Connecting to ${server.hostName} (${server.ip})...")
 
-        // Request VPN permission
         val prepareIntent = VpnService.prepare(this)
         if (prepareIntent != null) {
             pendingServer = server
@@ -204,106 +273,77 @@ class ServerListActivity : AppCompatActivity() {
         }
     }
 
-    private fun connectToServer(server: ServerConfig) {
-        VpnLog.i(TAG, "Starting VPN tunnel to ${server.name}...")
-
-        // Start the VPN service with the server's virtual IP
-        val intent = Intent(this, P2PVpnService::class.java).apply {
-            action = P2PVpnService.ACTION_START
-            putExtra(P2PVpnService.EXTRA_VIRTUAL_IP, "10.8.0.2")
+    private fun connectToServer(server: VpnGateServer) {
+        val intent = Intent(this, OpenVpnService::class.java).apply {
+            action = OpenVpnService.ACTION_CONNECT
+            putExtra(OpenVpnService.EXTRA_CONFIG_BASE64, server.openVpnConfigBase64)
+            putExtra(OpenVpnService.EXTRA_SERVER_NAME, "${server.countryFlag} ${server.hostName}")
+            putExtra(OpenVpnService.EXTRA_SERVER_IP, server.ip)
         }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)
         } else {
             startService(intent)
         }
 
-        connectedServerId = server.id
-
         // Update UI
         binding.layoutConnectionStatus.isVisible = true
-        binding.tvConnectedServer.text = "${server.countryFlag} Connected to ${server.name}"
+        binding.tvConnectedServer.text = "${server.countryFlag} ${server.hostName} • ${String.format("%.1f", server.speedMbps)} Mbps"
 
-        // Ping test in background
-        lifecycleScope.launch {
-            val ping = pingServer(server.host, server.port)
-            withContext(Dispatchers.Main) {
-                if (ping >= 0) {
-                    binding.tvConnectedServer.text =
-                        "${server.countryFlag} ${server.name} • ${ping}ms"
-                    VpnLog.success(TAG, "Connected to ${server.name} (${ping}ms)")
-                    Toast.makeText(
-                        this@ServerListActivity,
-                        "Connected to ${server.name}",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                } else {
-                    binding.tvConnectedServer.text =
-                        "${server.countryFlag} ${server.name} • VPN Active"
-                    VpnLog.success(TAG, "VPN active via ${server.name}")
-                }
-            }
+        Toast.makeText(this, "Connected to ${server.hostName}", Toast.LENGTH_SHORT).show()
+        VpnLog.success(TAG, "Connected to ${server.hostName}")
+
+        // Show share key option after short delay
+        binding.layoutConnectionStatus.postDelayed({
+            showShareKeyButton(server)
+        }, 1000)
+    }
+
+    private fun showShareKeyButton(server: VpnGateServer) {
+        // Add a "Share Key" button to the connection banner
+        binding.tvConnectedServer.setOnClickListener {
+            showShareKeyDialog(server)
         }
+        binding.tvConnectedServer.text = "${server.countryFlag} ${server.hostName} • Tap to share key"
+    }
 
-        // Highlight connected card
-        highlightConnectedServer(server.id)
+    private fun showShareKeyDialog(server: VpnGateServer) {
+        // Create a shareable key = base64 of the OpenVPN config + server info
+        // Another user can paste this key and connect to the same server
+        val shareData = "VPNGATE|${server.ip}|${server.hostName}|${server.countryShort}|${server.openVpnConfigBase64}"
+        val shareKey = android.util.Base64.encodeToString(shareData.toByteArray(), android.util.Base64.NO_WRAP)
+
+        val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("VPN Key", shareKey))
+
+        Toast.makeText(this, "Connection key copied! Share it with a friend.", Toast.LENGTH_LONG).show()
+        VpnLog.success(TAG, "Share key generated for ${server.hostName} (${shareKey.length} chars)")
+
+        // Also offer Android share
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, shareKey)
+            putExtra(Intent.EXTRA_SUBJECT, "VPN connection key - ${server.hostName}")
+        }
+        startActivity(Intent.createChooser(shareIntent, "Share VPN key via"))
     }
 
     private fun disconnectFromServer() {
-        VpnLog.i(TAG, "Disconnecting from server...")
-        val intent = Intent(this, P2PVpnService::class.java).apply {
-            action = P2PVpnService.ACTION_STOP
+        val intent = Intent(this, OpenVpnService::class.java).apply {
+            action = OpenVpnService.ACTION_DISCONNECT
         }
         startService(intent)
 
-        connectedServerId = null
         binding.layoutConnectionStatus.isVisible = false
-        resetAllCards()
-
         Toast.makeText(this, "Disconnected", Toast.LENGTH_SHORT).show()
-        VpnLog.i(TAG, "Disconnected from server")
-    }
-
-    private fun highlightConnectedServer(serverId: String) {
-        resetAllCards()
-        val card = binding.layoutServers.findViewWithTag<View>(serverId)
-        if (card is com.google.android.material.card.MaterialCardView) {
-            card.strokeColor = Color.parseColor("#4CAF50")
-            card.strokeWidth = (2 * resources.displayMetrics.density).toInt()
-        }
-    }
-
-    private fun resetAllCards() {
-        for (i in 0 until binding.layoutServers.childCount) {
-            val child = binding.layoutServers.getChildAt(i)
-            if (child is com.google.android.material.card.MaterialCardView) {
-                child.strokeColor = Color.parseColor("#3D3D5C")
-                child.strokeWidth = (1 * resources.displayMetrics.density).toInt()
-            }
-        }
+        VpnLog.i(TAG, "Disconnected")
     }
 
     private fun checkCurrentConnection() {
-        val service = P2PVpnService.instance
-        if (service != null) {
+        if (OpenVpnService.isConnected) {
             binding.layoutConnectionStatus.isVisible = true
-            binding.tvConnectedServer.text = "VPN Active"
-        }
-    }
-
-    private suspend fun pingServer(host: String, port: Int): Long {
-        return withContext(Dispatchers.IO) {
-            try {
-                val start = System.currentTimeMillis()
-                val socket = Socket()
-                socket.connect(InetSocketAddress(host, port), 3000)
-                val elapsed = System.currentTimeMillis() - start
-                socket.close()
-                elapsed
-            } catch (e: Exception) {
-                VpnLog.d(TAG, "Ping failed for $host: ${e.message}")
-                -1L
-            }
+            binding.tvConnectedServer.text = "${OpenVpnService.currentServerName} • Connected"
         }
     }
 }
