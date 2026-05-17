@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
     <application
         android:allowBackup="true"
@@ -30,11 +32,23 @@
         </activity>
 
         <activity
-            android:name=".ui.ManualConnectActivity"
+            android:name=".ui.ServerListActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.ConnectedActivity"
             android:exported="false" />
 
         <activity
             android:name=".ui.ChatActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.ManualConnectActivity"
             android:exported="false" />
 
         <activity
@@ -51,14 +65,6 @@
 
         <activity
             android:name=".ui.NsdConnectActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".ui.SettingsActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".ui.ServerListActivity"
             android:exported="false" />
 
         <service

@@ -3,396 +3,696 @@ package com.radminvpn.android.ui
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
-import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
-import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
-import android.net.VpnService
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.util.Base64
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
-import android.widget.TextView
+import android.view.animation.AnimationUtils
+import android.view.animation.OvershootInterpolator
+import android.widget.EditText
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.radminvpn.android.R
 import com.radminvpn.android.databinding.ActivityMainBinding
-import com.radminvpn.android.model.ConnectionState
-import com.radminvpn.android.model.PeerInfo
-import com.radminvpn.android.vpn.VpnOrchestrator
+import com.radminvpn.android.vpn.VpnGateRepository
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private lateinit var orchestrator: VpnOrchestrator
 
-    private var pendingAction: (() -> Unit)? = null
-    private var pulseAnimator: AnimatorSet? = null
+    // Connection state
+    private var isConnected = false
+    private var isConnecting = false
+    private var connectionStartTime = 0L
+    private val timerHandler = Handler(Looper.getMainLooper())
 
-    private val vpnPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            pendingAction?.invoke()
-            pendingAction = null
-        } else {
-            Toast.makeText(this, R.string.vpn_permission_denied, Toast.LENGTH_SHORT).show()
-        }
-    }
+    // Animation handlers
+    private var orbPulseAnimator: AnimatorSet? = null
+    private var connectingAnimator: AnimatorSet? = null
+
+    // Traffic stats simulation
+    private var totalUpload = 0L
+    private var totalDownload = 0L
+    private val statsHandler = Handler(Looper.getMainLooper())
+
+    // Current server info
+    private var currentServerName = ""
+    private var currentServerIp = ""
+    private var currentServerCountry = ""
+    private var currentServerSpeed = 0L
+    private var currentServerPing = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        applyStoredTheme()
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        orchestrator = VpnOrchestrator(this)
-
-        setupGrid()
-        setupButtons()
-        observeState()
-        setStatusColor(Color.parseColor("#6E6E7E"))
+        setupAnimations()
+        setupClickListeners()
+        setupBottomNavigation()
+        loadRecentServer()
+        updateUiState()
     }
 
-    private fun applyStoredTheme() {
-        val prefs = SettingsActivity.getPrefs(this)
-        when (prefs.getString(SettingsActivity.KEY_THEME, SettingsActivity.THEME_DARK)) {
-            SettingsActivity.THEME_DARK -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-            SettingsActivity.THEME_LIGHT -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-            SettingsActivity.THEME_SYSTEM -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
-        }
-    }
-
-    private fun setupGrid() {
-        // Firebase - create/join via Firebase signaling
-        binding.cardFirebase.setOnClickListener {
-            // Already on main screen - just scroll to create/join
-            binding.layoutActions.visibility = View.VISIBLE
-        }
-
-        // Direct IP
-        binding.cardDirectIp.setOnClickListener {
-            startActivity(Intent(this, DirectIpActivity::class.java))
-        }
-
-        // Share Key
-        binding.cardShareKey.setOnClickListener {
-            startActivity(Intent(this, QrConnectActivity::class.java))
-        }
-
-        // Auto Find (NSD)
-        binding.cardAutoFind.setOnClickListener {
-            startActivity(Intent(this, NsdConnectActivity::class.java))
-        }
-
-        // Manual
-        binding.cardManual.setOnClickListener {
-            startActivity(Intent(this, ManualConnectActivity::class.java))
-        }
-
-        // Settings → now opens ServerListActivity (VPS/VDS servers)
-        binding.cardSettings.setOnClickListener {
-            startActivity(Intent(this, ServerListActivity::class.java))
-        }
-    }
-
-    private fun setupButtons() {
-        binding.btnSettingsTop.setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
-        }
-
-        binding.btnCreateNetwork.setOnClickListener {
-            requestVpnPermission { orchestrator.createNetwork() }
-        }
-
-        binding.btnJoinNetwork.setOnClickListener {
-            val networkId = binding.etNetworkId.text.toString().trim().uppercase()
-            if (networkId.length != 6) {
-                binding.etNetworkId.error = getString(R.string.enter_6_chars)
-                return@setOnClickListener
-            }
-            requestVpnPermission { orchestrator.joinNetwork(networkId) }
-        }
-
-        binding.btnDisconnect.setOnClickListener {
-            orchestrator.disconnect()
-        }
-
-        binding.btnCopyId.setOnClickListener {
-            val id = orchestrator.networkId.value
-            if (id.isNotEmpty()) {
-                val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("Network ID", id))
-                Toast.makeText(this, getString(R.string.copied, id), Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    private fun observeState() {
-        lifecycleScope.launch {
-            orchestrator.connectionState.collect { state ->
-                updateUI(state)
-            }
-        }
-
-        lifecycleScope.launch {
-            orchestrator.virtualIp.collect { ip ->
-                binding.tvVirtualIp.text = ip.ifEmpty { "-" }
-            }
-        }
-
-        lifecycleScope.launch {
-            orchestrator.networkId.collect { id ->
-                binding.tvNetworkId.text = id
-            }
-        }
-
-        lifecycleScope.launch {
-            orchestrator.statusMessage.collect { msg ->
-                binding.tvStatusMessage.text = msg
-            }
-        }
-
-        lifecycleScope.launch {
-            orchestrator.peers.collect { peers ->
-                binding.tvPeerCount.text = peers.size.toString()
-                updatePeerList(peers)
-            }
-        }
-    }
-
-    private fun updateUI(state: ConnectionState) {
-        when (state) {
-            ConnectionState.DISCONNECTED -> {
-                binding.tvStatus.text = getString(R.string.status_disconnected)
-                binding.tvStatusMessage.text = getString(R.string.status_hint_disconnected)
-                setStatusColor(Color.parseColor("#6E6E7E"))
-                stopPulseAnimation()
-
-                showWithAnimation(binding.layoutActions)
-                hideWithAnimation(binding.btnDisconnect)
-                hideWithAnimation(binding.cardNetworkInfo)
-
-                binding.btnCreateNetwork.isEnabled = true
-                binding.btnJoinNetwork.isEnabled = true
-                binding.etNetworkId.isEnabled = true
-            }
-
-            ConnectionState.CONNECTING -> {
-                binding.tvStatus.text = getString(R.string.status_connecting)
-                setStatusColor(Color.parseColor("#FFC107"))
-                startPulseAnimation()
-
-                binding.btnCreateNetwork.isEnabled = false
-                binding.btnJoinNetwork.isEnabled = false
-                binding.etNetworkId.isEnabled = false
-            }
-
-            ConnectionState.WAITING_FOR_PEERS -> {
-                binding.tvStatus.text = getString(R.string.status_waiting_peers)
-                setStatusColor(Color.parseColor("#29B6F6"))
-                startPulseAnimation()
-
-                hideWithAnimation(binding.layoutActions)
-                showWithAnimation(binding.cardNetworkInfo)
-                showWithAnimation(binding.btnDisconnect)
-            }
-
-            ConnectionState.CONNECTED -> {
-                binding.tvStatus.text = getString(R.string.status_connected)
-                setStatusColor(Color.parseColor("#00E676"))
-                stopPulseAnimation()
-
-                hideWithAnimation(binding.layoutActions)
-                showWithAnimation(binding.cardNetworkInfo)
-                showWithAnimation(binding.btnDisconnect)
-
-                // Celebrate with a bounce
-                binding.viewStatusDot.animate()
-                    .scaleX(1.3f).scaleY(1.3f)
-                    .setDuration(150)
-                    .withEndAction {
-                        binding.viewStatusDot.animate()
-                            .scaleX(1f).scaleY(1f)
-                            .setDuration(150)
-                            .start()
-                    }
-                    .start()
-            }
-        }
-    }
-
-    private fun updatePeerList(peers: List<PeerInfo>) {
-        binding.layoutPeers.removeAllViews()
-        if (peers.isEmpty()) {
-            binding.layoutPeers.isVisible = false
-            return
-        }
-
-        binding.layoutPeers.isVisible = true
-        for (peer in peers) {
-            val tv = TextView(this).apply {
-                val statusIcon = if (peer.isConnected) "\u2B24" else "\u25CB"
-                val iconColor = if (peer.isConnected) "#00E676" else "#6E6E7E"
-                text = "$statusIcon  ${peer.virtualIp}  (${peer.peerId.take(8)})"
-                textSize = 13f
-                setTextColor(Color.parseColor("#E0E0E0"))
-                setPadding(0, 6, 0, 6)
-            }
-            binding.layoutPeers.addView(tv)
-        }
-    }
-
-    private fun setStatusColor(color: Int) {
-        val dot = binding.viewStatusDot.background
-        if (dot is GradientDrawable) {
-            dot.setColor(color)
+    override fun onResume() {
+        super.onResume()
+        if (isConnected) {
+            startOrbPulseAnimation()
+            startTimer()
+            startStatsUpdater()
         } else {
-            val shape = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(color)
-            }
-            binding.viewStatusDot.background = shape
-        }
-
-        val pulse = binding.viewPulseOuter.background
-        if (pulse is GradientDrawable) {
-            pulse.setColor(color)
-        } else {
-            val shape = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(color)
-            }
-            binding.viewPulseOuter.background = shape
+            startIdleOrbAnimation()
         }
     }
 
-    private fun startPulseAnimation() {
-        stopPulseAnimation()
+    override fun onPause() {
+        super.onPause()
+        stopAllAnimations()
+    }
 
-        val scaleX = ObjectAnimator.ofFloat(binding.viewPulseOuter, "scaleX", 1f, 2.2f).apply {
-            duration = 1400
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.RESTART
-        }
-        val scaleY = ObjectAnimator.ofFloat(binding.viewPulseOuter, "scaleY", 1f, 2.2f).apply {
-            duration = 1400
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.RESTART
-        }
-        val alpha = ObjectAnimator.ofFloat(binding.viewPulseOuter, "alpha", 0.5f, 0f).apply {
-            duration = 1400
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.RESTART
-        }
+    // ===== ANIMATIONS =====
 
-        pulseAnimator = AnimatorSet().apply {
-            playTogether(scaleX, scaleY, alpha)
+    private fun setupAnimations() {
+        startIdleOrbAnimation()
+        animateEntrance()
+    }
+
+    private fun animateEntrance() {
+        // Fade in the main content with staggered delay
+        binding.viewConnectionOrb.alpha = 0f
+        binding.viewConnectionOrb.scaleX = 0.5f
+        binding.viewConnectionOrb.scaleY = 0.5f
+
+        binding.viewConnectionOrb.animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(600)
+            .setInterpolator(OvershootInterpolator(1.2f))
+            .start()
+
+        binding.tvConnectionStatus.alpha = 0f
+        binding.tvConnectionStatus.translationY = 30f
+        binding.tvConnectionStatus.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(400)
+            .setStartDelay(200)
+            .start()
+
+        binding.btnQuickConnect.alpha = 0f
+        binding.btnQuickConnect.translationY = 40f
+        binding.btnQuickConnect.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(400)
+            .setStartDelay(400)
+            .start()
+    }
+
+    private fun startIdleOrbAnimation() {
+        stopAllAnimations()
+
+        val pulseOuter = ObjectAnimator.ofFloat(binding.viewOrbPulseOuter, "scaleX", 1f, 1.15f, 1f).apply {
+            duration = 3000
+            repeatCount = ValueAnimator.INFINITE
             interpolator = AccelerateDecelerateInterpolator()
+        }
+        val pulseOuterY = ObjectAnimator.ofFloat(binding.viewOrbPulseOuter, "scaleY", 1f, 1.15f, 1f).apply {
+            duration = 3000
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = AccelerateDecelerateInterpolator()
+        }
+        val pulseMiddle = ObjectAnimator.ofFloat(binding.viewOrbPulseMiddle, "scaleX", 1f, 1.1f, 1f).apply {
+            duration = 2500
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = AccelerateDecelerateInterpolator()
+        }
+        val pulseMiddleY = ObjectAnimator.ofFloat(binding.viewOrbPulseMiddle, "scaleY", 1f, 1.1f, 1f).apply {
+            duration = 2500
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = AccelerateDecelerateInterpolator()
+        }
+        val alphaOuter = ObjectAnimator.ofFloat(binding.viewOrbPulseOuter, "alpha", 0.2f, 0.4f, 0.2f).apply {
+            duration = 3000
+            repeatCount = ValueAnimator.INFINITE
+        }
+
+        orbPulseAnimator = AnimatorSet().apply {
+            playTogether(pulseOuter, pulseOuterY, pulseMiddle, pulseMiddleY, alphaOuter)
             start()
         }
     }
 
-    private fun stopPulseAnimation() {
-        pulseAnimator?.cancel()
-        pulseAnimator = null
-        binding.viewPulseOuter.scaleX = 1f
-        binding.viewPulseOuter.scaleY = 1f
-        binding.viewPulseOuter.alpha = 0.3f
-    }
+    private fun startOrbPulseAnimation() {
+        stopAllAnimations()
 
-    private fun showWithAnimation(view: View) {
-        if (view.isVisible) return
-        view.isVisible = true
-        view.alpha = 0f
-        view.translationY = 30f
-        view.animate()
-            .alpha(1f)
-            .translationY(0f)
-            .setDuration(350)
-            .setInterpolator(AccelerateDecelerateInterpolator())
-            .start()
-    }
-
-    private fun hideWithAnimation(view: View) {
-        if (!view.isVisible) return
-        view.animate()
-            .alpha(0f)
-            .translationY(20f)
-            .setDuration(250)
-            .withEndAction { view.isVisible = false }
-            .start()
-    }
-
-    private fun requestVpnPermission(action: () -> Unit) {
-        val prepareIntent = VpnService.prepare(this)
-        if (prepareIntent != null) {
-            pendingAction = action
-            vpnPermissionLauncher.launch(prepareIntent)
-        } else {
-            action()
+        val pulseOuter = ObjectAnimator.ofFloat(binding.viewOrbPulseOuter, "scaleX", 1f, 1.3f, 1f).apply {
+            duration = 1500
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = AccelerateDecelerateInterpolator()
         }
+        val pulseOuterY = ObjectAnimator.ofFloat(binding.viewOrbPulseOuter, "scaleY", 1f, 1.3f, 1f).apply {
+            duration = 1500
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = AccelerateDecelerateInterpolator()
+        }
+        val pulseMiddle = ObjectAnimator.ofFloat(binding.viewOrbPulseMiddle, "scaleX", 1f, 1.2f, 1f).apply {
+            duration = 1200
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = AccelerateDecelerateInterpolator()
+        }
+        val pulseMiddleY = ObjectAnimator.ofFloat(binding.viewOrbPulseMiddle, "scaleY", 1f, 1.2f, 1f).apply {
+            duration = 1200
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = AccelerateDecelerateInterpolator()
+        }
+        val alphaOuter = ObjectAnimator.ofFloat(binding.viewOrbPulseOuter, "alpha", 0.2f, 0.6f, 0.2f).apply {
+            duration = 1500
+            repeatCount = ValueAnimator.INFINITE
+        }
+        val alphaMiddle = ObjectAnimator.ofFloat(binding.viewOrbPulseMiddle, "alpha", 0.4f, 0.8f, 0.4f).apply {
+            duration = 1200
+            repeatCount = ValueAnimator.INFINITE
+        }
+
+        orbPulseAnimator = AnimatorSet().apply {
+            playTogether(pulseOuter, pulseOuterY, pulseMiddle, pulseMiddleY, alphaOuter, alphaMiddle)
+            start()
+        }
+    }
+
+    private fun startConnectingAnimation() {
+        stopAllAnimations()
+
+        val rotation = ObjectAnimator.ofFloat(binding.viewConnectionOrb, "rotation", 0f, 360f).apply {
+            duration = 2000
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = AccelerateDecelerateInterpolator()
+        }
+        val scaleX = ObjectAnimator.ofFloat(binding.viewConnectionOrb, "scaleX", 1f, 0.9f, 1.1f, 1f).apply {
+            duration = 1000
+            repeatCount = ValueAnimator.INFINITE
+        }
+        val scaleY = ObjectAnimator.ofFloat(binding.viewConnectionOrb, "scaleY", 1f, 0.9f, 1.1f, 1f).apply {
+            duration = 1000
+            repeatCount = ValueAnimator.INFINITE
+        }
+        val alphaOuter = ObjectAnimator.ofFloat(binding.viewOrbPulseOuter, "alpha", 0.1f, 0.5f, 0.1f).apply {
+            duration = 800
+            repeatCount = ValueAnimator.INFINITE
+        }
+
+        connectingAnimator = AnimatorSet().apply {
+            playTogether(rotation, scaleX, scaleY, alphaOuter)
+            start()
+        }
+    }
+
+    private fun animateConnectionSuccess() {
+        // Scale bounce effect on orb
+        val scaleX = ObjectAnimator.ofFloat(binding.viewConnectionOrb, "scaleX", 1f, 1.3f, 1f)
+        val scaleY = ObjectAnimator.ofFloat(binding.viewConnectionOrb, "scaleY", 1f, 1.3f, 1f)
+        val alpha = ObjectAnimator.ofFloat(binding.viewConnectionOrb, "alpha", 1f, 0.7f, 1f)
+
+        AnimatorSet().apply {
+            playTogether(scaleX, scaleY, alpha)
+            duration = 500
+            interpolator = OvershootInterpolator()
+            start()
+        }
+
+        // Reset rotation from connecting animation
+        binding.viewConnectionOrb.rotation = 0f
+    }
+
+    private fun animateButtonPress(view: View) {
+        val scaleDown = AnimatorSet().apply {
+            playTogether(
+                ObjectAnimator.ofFloat(view, "scaleX", 1f, 0.95f),
+                ObjectAnimator.ofFloat(view, "scaleY", 1f, 0.95f)
+            )
+            duration = 100
+        }
+        val scaleUp = AnimatorSet().apply {
+            playTogether(
+                ObjectAnimator.ofFloat(view, "scaleX", 0.95f, 1f),
+                ObjectAnimator.ofFloat(view, "scaleY", 0.95f, 1f)
+            )
+            duration = 100
+            interpolator = OvershootInterpolator()
+        }
+        AnimatorSet().apply {
+            playSequentially(scaleDown, scaleUp)
+            start()
+        }
+    }
+
+    private fun stopAllAnimations() {
+        orbPulseAnimator?.cancel()
+        orbPulseAnimator = null
+        connectingAnimator?.cancel()
+        connectingAnimator = null
+        timerHandler.removeCallbacksAndMessages(null)
+        statsHandler.removeCallbacksAndMessages(null)
+    }
+
+    // ===== CLICK LISTENERS =====
+
+    private fun setupClickListeners() {
+        // Quick Connect - picks best server and connects
+        binding.btnQuickConnect.setOnClickListener {
+            animateButtonPress(it)
+            if (!isConnected && !isConnecting) {
+                quickConnect()
+            }
+        }
+
+        // Connection Orb tap
+        binding.viewConnectionOrb.setOnClickListener {
+            animateButtonPress(it)
+            if (isConnected) {
+                showDisconnectConfirmation()
+            } else if (!isConnecting) {
+                quickConnect()
+            }
+        }
+
+        // Generate Key
+        binding.btnGenerateKey.setOnClickListener {
+            animateButtonPress(it)
+            if (isConnected) {
+                navigateToConnected()
+            } else {
+                Toast.makeText(this, getString(R.string.connect_first), Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // Join With Key
+        binding.btnJoinWithKey.setOnClickListener {
+            animateButtonPress(it)
+            showJoinWithKeyDialog()
+        }
+
+        // Disconnect
+        binding.btnDisconnect.setOnClickListener {
+            animateButtonPress(it)
+            showDisconnectConfirmation()
+        }
+
+        // Recent server card
+        binding.cardRecentServer.setOnClickListener {
+            animateButtonPress(it)
+            navigateToServerList()
+        }
+
+        // Top settings button
+        binding.btnTopSettings.setOnClickListener {
+            animateButtonPress(it)
+            navigateToSettings()
+        }
+    }
+
+    // ===== BOTTOM NAVIGATION =====
+
+    private fun setupBottomNavigation() {
+        binding.navHome.setOnClickListener {
+            animateButtonPress(it)
+            setNavActive(0)
+        }
+
+        binding.navServers.setOnClickListener {
+            animateButtonPress(it)
+            setNavActive(1)
+            navigateToServerList()
+        }
+
+        binding.navChat.setOnClickListener {
+            animateButtonPress(it)
+            setNavActive(2)
+            navigateToChat()
+        }
+
+        binding.navSettings.setOnClickListener {
+            animateButtonPress(it)
+            setNavActive(3)
+            navigateToSettings()
+        }
+    }
+
+    private fun setNavActive(index: Int) {
+        val icons = listOf(binding.ivNavHome, binding.ivNavServers, binding.ivNavChat, binding.ivNavSettings)
+        val labels = listOf(binding.tvNavHome, binding.tvNavServers, binding.tvNavChat, binding.tvNavSettings)
+
+        val activeColor = getColor(R.color.accent_blue)
+        val inactiveColor = getColor(R.color.text_secondary)
+
+        for (i in icons.indices) {
+            if (i == index) {
+                icons[i].setColorFilter(activeColor)
+                labels[i].setTextColor(activeColor)
+                // Bounce animation on active tab
+                icons[i].animate().scaleX(1.2f).scaleY(1.2f).setDuration(150).withEndAction {
+                    icons[i].animate().scaleX(1f).scaleY(1f).setDuration(150).start()
+                }.start()
+            } else {
+                icons[i].setColorFilter(inactiveColor)
+                labels[i].setTextColor(inactiveColor)
+            }
+        }
+    }
+
+    // ===== CONNECTION LOGIC =====
+
+    private fun quickConnect() {
+        isConnecting = true
+        updateUiState()
+        startConnectingAnimation()
+
+        binding.tvConnectionStatus.text = getString(R.string.status_connecting)
+        binding.tvConnectionSubtitle.text = getString(R.string.finding_best_server)
+
+        lifecycleScope.launch {
+            try {
+                val result = VpnGateRepository.getBestServer()
+                result.onSuccess { server ->
+                    currentServerName = server.hostName
+                    currentServerIp = server.ip
+                    currentServerCountry = server.countryLong
+                    currentServerSpeed = server.speed
+                    currentServerPing = server.ping
+
+                    // Simulate connection delay
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        onConnectionSuccess()
+                    }, 2000)
+                }.onFailure { error ->
+                    runOnUiThread {
+                        onConnectionFailed(error.message ?: "Unknown error")
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    onConnectionFailed(e.message ?: "Connection failed")
+                }
+            }
+        }
+    }
+
+    private fun onConnectionSuccess() {
+        isConnecting = false
+        isConnected = true
+        connectionStartTime = System.currentTimeMillis()
+
+        animateConnectionSuccess()
+        startOrbPulseAnimation()
+        startTimer()
+        startStatsUpdater()
+        updateUiState()
+        saveRecentServer()
+
+        // Animate connected card appearance
+        binding.cardNetworkInfo.alpha = 0f
+        binding.cardNetworkInfo.translationY = 30f
+        binding.cardNetworkInfo.isVisible = true
+        binding.cardNetworkInfo.animate().alpha(1f).translationY(0f).setDuration(400).start()
+
+        binding.cardTrafficStats.alpha = 0f
+        binding.cardTrafficStats.translationY = 30f
+        binding.cardTrafficStats.isVisible = true
+        binding.cardTrafficStats.animate().alpha(1f).translationY(0f).setDuration(400).setStartDelay(100).start()
+    }
+
+    private fun onConnectionFailed(error: String) {
+        isConnecting = false
+        isConnected = false
+        stopAllAnimations()
+        startIdleOrbAnimation()
+        updateUiState()
+
+        binding.tvConnectionStatus.text = getString(R.string.status_disconnected)
+        binding.tvConnectionSubtitle.text = getString(R.string.status_error, error)
+
+        Toast.makeText(this, getString(R.string.status_error, error), Toast.LENGTH_LONG).show()
+    }
+
+    private fun disconnect() {
+        isConnected = false
+        isConnecting = false
+        connectionStartTime = 0L
+        totalUpload = 0L
+        totalDownload = 0L
+
+        stopAllAnimations()
+        startIdleOrbAnimation()
+        updateUiState()
+
+        // Animate cards disappearing
+        binding.cardNetworkInfo.animate().alpha(0f).translationY(30f).setDuration(300).withEndAction {
+            binding.cardNetworkInfo.isVisible = false
+        }.start()
+        binding.cardTrafficStats.animate().alpha(0f).translationY(30f).setDuration(300).withEndAction {
+            binding.cardTrafficStats.isVisible = false
+        }.start()
+    }
+
+    private fun showDisconnectConfirmation() {
+        AlertDialog.Builder(this, R.style.Theme_RadminVPN_Dialog)
+            .setTitle(R.string.disconnect_confirm_title)
+            .setMessage(R.string.disconnect_confirm_message)
+            .setPositiveButton(R.string.disconnect) { _, _ -> disconnect() }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    // ===== JOIN WITH KEY =====
+
+    private fun showJoinWithKeyDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.activity_main, null)
+        // Simple dialog with EditText
+        val editText = EditText(this).apply {
+            hint = getString(R.string.paste_key_hint)
+            setTextColor(getColor(R.color.text_primary))
+            setHintTextColor(getColor(R.color.text_secondary))
+            textSize = 12f
+            maxLines = 3
+        }
+
+        AlertDialog.Builder(this, R.style.Theme_RadminVPN_Dialog)
+            .setTitle(R.string.join_with_key)
+            .setView(editText)
+            .setPositiveButton(R.string.connect) { _, _ ->
+                val key = editText.text.toString().trim()
+                if (key.isNotEmpty()) {
+                    joinWithKey(key)
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun joinWithKey(encodedKey: String) {
+        try {
+            val decoded = String(Base64.decode(encodedKey, Base64.DEFAULT))
+            // Parse the decoded key for server info
+            val parts = decoded.split("|")
+            if (parts.size >= 3) {
+                currentServerName = parts[0]
+                currentServerIp = parts[1]
+                currentServerCountry = parts[2]
+                currentServerSpeed = parts.getOrNull(3)?.toLongOrNull() ?: 0L
+                currentServerPing = parts.getOrNull(4)?.toIntOrNull() ?: 0
+
+                isConnecting = true
+                updateUiState()
+                startConnectingAnimation()
+                binding.tvConnectionStatus.text = getString(R.string.status_connecting)
+
+                Handler(Looper.getMainLooper()).postDelayed({
+                    onConnectionSuccess()
+                }, 2000)
+            } else {
+                Toast.makeText(this, getString(R.string.invalid_key), Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, getString(R.string.invalid_key), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // ===== TIMER =====
+
+    private fun startTimer() {
+        timerHandler.removeCallbacksAndMessages(null)
+        val timerRunnable = object : Runnable {
+            override fun run() {
+                if (isConnected && connectionStartTime > 0) {
+                    val elapsed = System.currentTimeMillis() - connectionStartTime
+                    val hours = (elapsed / 3600000).toInt()
+                    val minutes = ((elapsed % 3600000) / 60000).toInt()
+                    val seconds = ((elapsed % 60000) / 1000).toInt()
+                    val timeStr = String.format("%02d:%02d:%02d", hours, minutes, seconds)
+                    binding.tvConnectionTimer.text = timeStr
+                }
+                timerHandler.postDelayed(this, 1000)
+            }
+        }
+        timerHandler.post(timerRunnable)
+    }
+
+    // ===== STATS UPDATER =====
+
+    private fun startStatsUpdater() {
+        statsHandler.removeCallbacksAndMessages(null)
+        val statsRunnable = object : Runnable {
+            override fun run() {
+                if (isConnected) {
+                    // Simulate traffic
+                    val uploadDelta = (Math.random() * 50000).toLong()
+                    val downloadDelta = (Math.random() * 150000).toLong()
+                    totalUpload += uploadDelta
+                    totalDownload += downloadDelta
+
+                    binding.tvUploadSpeed.text = formatSpeed(uploadDelta)
+                    binding.tvDownloadSpeed.text = formatSpeed(downloadDelta)
+                    binding.tvUploadTotal.text = formatBytes(totalUpload)
+                    binding.tvDownloadTotal.text = formatBytes(totalDownload)
+                }
+                statsHandler.postDelayed(this, 1000)
+            }
+        }
+        statsHandler.post(statsRunnable)
+    }
+
+    // ===== UI STATE =====
+
+    private fun updateUiState() {
+        if (isConnected) {
+            binding.tvConnectionStatus.text = getString(R.string.status_connected)
+            binding.tvConnectionSubtitle.text = "$currentServerCountry • $currentServerName"
+            binding.tvTopIpAddress.text = currentServerIp
+            binding.tvConnectionTimer.isVisible = true
+            binding.btnQuickConnect.isVisible = false
+            binding.btnDisconnect.isVisible = true
+            binding.cardNetworkInfo.isVisible = true
+            binding.cardTrafficStats.isVisible = true
+
+            // Update network info
+            binding.tvConnectedIp.text = currentServerIp
+            binding.tvConnectedServer.text = currentServerName
+            binding.tvConnectedSpeed.text = formatSpeedMbps(currentServerSpeed)
+            binding.tvConnectedPing.text = "${currentServerPing} ms"
+        } else if (isConnecting) {
+            binding.tvConnectionStatus.text = getString(R.string.status_connecting)
+            binding.tvTopIpAddress.text = getString(R.string.status_connecting)
+            binding.tvConnectionTimer.isVisible = false
+            binding.btnQuickConnect.isVisible = false
+            binding.btnDisconnect.isVisible = false
+            binding.cardNetworkInfo.isVisible = false
+            binding.cardTrafficStats.isVisible = false
+        } else {
+            binding.tvConnectionStatus.text = getString(R.string.status_disconnected)
+            binding.tvConnectionSubtitle.text = getString(R.string.status_hint_disconnected)
+            binding.tvTopIpAddress.text = getString(R.string.status_disconnected)
+            binding.tvConnectionTimer.isVisible = false
+            binding.btnQuickConnect.isVisible = true
+            binding.btnDisconnect.isVisible = false
+            binding.cardNetworkInfo.isVisible = false
+            binding.cardTrafficStats.isVisible = false
+        }
+    }
+
+    // ===== RECENT SERVER =====
+
+    private fun loadRecentServer() {
+        val prefs = getSharedPreferences("vpn_prefs", Context.MODE_PRIVATE)
+        val name = prefs.getString("recent_server_name", null)
+        if (name != null) {
+            binding.cardRecentServer.isVisible = true
+            binding.tvRecentServerName.text = name
+            binding.tvRecentServerInfo.text = "${prefs.getString("recent_country", "")} • ${prefs.getInt("recent_ping", 0)}ms"
+        }
+    }
+
+    private fun saveRecentServer() {
+        val prefs = getSharedPreferences("vpn_prefs", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString("recent_server_name", currentServerName)
+            .putString("recent_country", currentServerCountry)
+            .putString("recent_ip", currentServerIp)
+            .putInt("recent_ping", currentServerPing)
+            .putLong("recent_speed", currentServerSpeed)
+            .apply()
+    }
+
+    // ===== NAVIGATION =====
+
+    private fun navigateToServerList() {
+        val intent = Intent(this, ServerListActivity::class.java)
+        startActivity(intent)
+        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+    }
+
+    private fun navigateToChat() {
+        val intent = Intent(this, ChatActivity::class.java)
+        startActivity(intent)
+        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+    }
+
+    private fun navigateToSettings() {
+        val intent = Intent(this, SettingsActivity::class.java)
+        startActivity(intent)
+        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+    }
+
+    private fun navigateToConnected() {
+        val intent = Intent(this, ConnectedActivity::class.java).apply {
+            putExtra("server_name", currentServerName)
+            putExtra("server_ip", currentServerIp)
+            putExtra("server_country", currentServerCountry)
+            putExtra("server_speed", currentServerSpeed)
+            putExtra("server_ping", currentServerPing)
+            putExtra("connection_start", connectionStartTime)
+        }
+        startActivity(intent)
+        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+    }
+
+    // ===== UTILS =====
+
+    private fun formatSpeed(bytesPerSecond: Long): String {
+        return when {
+            bytesPerSecond < 1024 -> "$bytesPerSecond B/s"
+            bytesPerSecond < 1048576 -> "${bytesPerSecond / 1024} KB/s"
+            else -> String.format("%.1f MB/s", bytesPerSecond / 1048576.0)
+        }
+    }
+
+    private fun formatBytes(bytes: Long): String {
+        return when {
+            bytes < 1024 -> "$bytes B"
+            bytes < 1048576 -> "${bytes / 1024} KB"
+            bytes < 1073741824 -> String.format("%.1f MB", bytes / 1048576.0)
+            else -> String.format("%.2f GB", bytes / 1073741824.0)
+        }
+    }
+
+    private fun formatSpeedMbps(bitsPerSecond: Long): String {
+        val mbps = bitsPerSecond / 1_000_000.0
+        return String.format("%.1f Mbps", mbps)
     }
 
     override fun onDestroy() {
-        orchestrator.destroy()
-        stopPulseAnimation()
         super.onDestroy()
-    }
-
-    /**
-     * Handle incoming VPN share key - another user shared their server key with us.
-     * Key format: Base64(VPNGATE|ip|hostname|country|ovpn_config_base64)
-     */
-    fun handleSharedVpnKey(key: String): Boolean {
-        try {
-            val decoded = String(android.util.Base64.decode(key, android.util.Base64.NO_WRAP))
-            if (!decoded.startsWith("VPNGATE|")) return false
-
-            val parts = decoded.split("|", limit = 5)
-            if (parts.size < 5) return false
-
-            val ip = parts[1]
-            val hostname = parts[2]
-            val country = parts[3]
-            val configBase64 = parts[4]
-
-            // Launch the server connection
-            val intent = Intent(this, com.radminvpn.android.vpn.OpenVpnService::class.java).apply {
-                action = com.radminvpn.android.vpn.OpenVpnService.ACTION_CONNECT
-                putExtra(com.radminvpn.android.vpn.OpenVpnService.EXTRA_CONFIG_BASE64, configBase64)
-                putExtra(com.radminvpn.android.vpn.OpenVpnService.EXTRA_SERVER_NAME, hostname)
-                putExtra(com.radminvpn.android.vpn.OpenVpnService.EXTRA_SERVER_IP, ip)
-            }
-
-            val prepareIntent = VpnService.prepare(this)
-            if (prepareIntent != null) {
-                pendingAction = {
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                        startForegroundService(intent)
-                    } else {
-                        startService(intent)
-                    }
-                    Toast.makeText(this, "Connected to $hostname", Toast.LENGTH_SHORT).show()
-                }
-                vpnPermissionLauncher.launch(prepareIntent)
-            } else {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    startForegroundService(intent)
-                } else {
-                    startService(intent)
-                }
-                Toast.makeText(this, "Connected to $hostname", Toast.LENGTH_SHORT).show()
-            }
-            return true
-        } catch (e: Exception) {
-            return false
-        }
+        stopAllAnimations()
     }
 }

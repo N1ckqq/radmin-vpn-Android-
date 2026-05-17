@@ -1,103 +1,313 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#121218">
+    android:background="@drawable/bg_gradient_dark"
+    android:fitsSystemWindows="true">
 
-    <!-- Top Bar -->
+    <!-- Top Toolbar -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="64dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingHorizontal="16dp"
-        android:background="#0D0D14">
+        android:paddingHorizontal="16dp">
 
-        <ImageButton
+        <FrameLayout
             android:id="@+id/btnBack"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@android:drawable/ic_menu_revert"
-            app:tint="#E0E0E0"
-            android:contentDescription="Back" />
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@drawable/bg_nav_item"
+            android:clickable="true"
+            android:focusable="true">
 
-        <TextView
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:src="@android:drawable/ic_menu_revert"
+                app:tint="#E0E0E0" />
+
+        </FrameLayout>
+
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/servers_title"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:textColor="#FFFFFF"
-            android:layout_marginStart="12dp" />
+            android:orientation="vertical"
+            android:layout_marginStart="12dp">
 
-        <TextView
-            android:id="@+id/tvServerCount"
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/servers_title"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF" />
+
+            <TextView
+                android:id="@+id/tvServerCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/loading_servers"
+                android:textSize="12sp"
+                android:textColor="#6E6E7E" />
+
+        </LinearLayout>
+
+        <!-- Ping All Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPingAll"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="13sp"
-            android:textColor="#9E9EAE" />
+            android:layout_height="36dp"
+            android:text="@string/ping_all"
+            android:textSize="12sp"
+            android:textAllCaps="false"
+            android:textColor="#2979FF"
+            app:backgroundTint="#1A1A2E"
+            app:cornerRadius="10dp"
+            app:strokeColor="#2979FF"
+            app:strokeWidth="1dp"
+            app:rippleColor="#332979FF" />
 
     </LinearLayout>
 
-    <!-- Connection Status Banner -->
+    <!-- Search Bar -->
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="4dp"
+        app:cardCornerRadius="14dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="#1A1A2E"
+        app:strokeColor="#2D2D44"
+        app:strokeWidth="1dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="14dp">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@android:drawable/ic_menu_search"
+                app:tint="#6E6E7E" />
+
+            <EditText
+                android:id="@+id/etSearch"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@null"
+                android:hint="@string/search_servers"
+                android:textColorHint="#6E6E7E"
+                android:textColor="#E0E0E0"
+                android:textSize="14sp"
+                android:layout_marginStart="10dp"
+                android:inputType="text"
+                android:imeOptions="actionSearch"
+                android:maxLines="1" />
+
+            <ImageView
+                android:id="@+id/btnClearSearch"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                app:tint="#6E6E7E"
+                android:visibility="gone"
+                android:clickable="true"
+                android:focusable="true" />
+
+        </LinearLayout>
+
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Country Filter Chips -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:scrollbars="none"
+        android:clipToPadding="false"
+        android:paddingHorizontal="16dp">
+
+        <LinearLayout
+            android:id="@+id/layoutCountryChips"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipAll"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="@string/filter_all"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                app:chipBackgroundColor="#2979FF"
+                app:chipCornerRadius="10dp"
+                app:chipStrokeColor="#2979FF"
+                app:chipStrokeWidth="0dp"
+                android:layout_marginEnd="6dp" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipJapan"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="🇯🇵 Japan"
+                android:textColor="#9E9EAE"
+                android:textSize="12sp"
+                app:chipBackgroundColor="#1A1A2E"
+                app:chipCornerRadius="10dp"
+                app:chipStrokeColor="#2D2D44"
+                app:chipStrokeWidth="1dp"
+                android:layout_marginEnd="6dp" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipKorea"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="🇰🇷 Korea"
+                android:textColor="#9E9EAE"
+                android:textSize="12sp"
+                app:chipBackgroundColor="#1A1A2E"
+                app:chipCornerRadius="10dp"
+                app:chipStrokeColor="#2D2D44"
+                app:chipStrokeWidth="1dp"
+                android:layout_marginEnd="6dp" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipUS"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="🇺🇸 USA"
+                android:textColor="#9E9EAE"
+                android:textSize="12sp"
+                app:chipBackgroundColor="#1A1A2E"
+                app:chipCornerRadius="10dp"
+                app:chipStrokeColor="#2D2D44"
+                app:chipStrokeWidth="1dp"
+                android:layout_marginEnd="6dp" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipEurope"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="🇪🇺 Europe"
+                android:textColor="#9E9EAE"
+                android:textSize="12sp"
+                app:chipBackgroundColor="#1A1A2E"
+                app:chipCornerRadius="10dp"
+                app:chipStrokeColor="#2D2D44"
+                app:chipStrokeWidth="1dp"
+                android:layout_marginEnd="6dp" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipRussia"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="🇷🇺 Russia"
+                android:textColor="#9E9EAE"
+                android:textSize="12sp"
+                app:chipBackgroundColor="#1A1A2E"
+                app:chipCornerRadius="10dp"
+                app:chipStrokeColor="#2D2D44"
+                app:chipStrokeWidth="1dp"
+                android:layout_marginEnd="6dp" />
+
+        </LinearLayout>
+
+    </HorizontalScrollView>
+
+    <!-- Sort Dropdown -->
     <LinearLayout
-        android:id="@+id/layoutConnectionStatus"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="12dp"
         android:gravity="center_vertical"
-        android:background="#1A2979FF"
-        android:visibility="gone">
-
-        <View
-            android:id="@+id/viewConnectedDot"
-            android:layout_width="10dp"
-            android:layout_height="10dp"
-            android:background="@drawable/circle_status"
-            android:backgroundTint="#4CAF50"
-            android:layout_marginEnd="10dp" />
+        android:paddingHorizontal="16dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="8dp">
 
         <TextView
-            android:id="@+id/tvConnectedServer"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Connected to..."
-            android:textSize="13sp"
-            android:textColor="#E0E0E0" />
+            android:text="@string/sort_by"
+            android:textSize="12sp"
+            android:textColor="#6E6E7E" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnDisconnect"
+        <Spinner
+            android:id="@+id/spinnerSort"
             android:layout_width="wrap_content"
             android:layout_height="32dp"
-            android:text="@string/disconnect"
-            android:textSize="11sp"
-            android:textAllCaps="false"
-            android:backgroundTint="#FF5252"
-            app:cornerRadius="8dp"
-            android:minWidth="0dp"
-            android:paddingHorizontal="12dp" />
+            android:background="@drawable/bg_input_field"
+            android:paddingHorizontal="12dp"
+            android:popupBackground="#1A1A2E" />
 
     </LinearLayout>
 
-    <!-- Server List -->
-    <androidx.core.widget.NestedScrollView
+    <!-- Loading Indicator -->
+    <FrameLayout
+        android:id="@+id/layoutLoading"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:clipToPadding="false">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:visibility="gone">
 
         <LinearLayout
-            android:id="@+id/layoutServers"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center"
             android:orientation="vertical"
-            android:padding="16dp" />
+            android:gravity="center">
 
-    </androidx.core.widget.NestedScrollView>
+            <ProgressBar
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:indeterminateTint="#2979FF" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/loading_servers"
+                android:textSize="14sp"
+                android:textColor="#6E6E7E"
+                android:layout_marginTop="12dp" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+    <!-- Server List -->
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefresh"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="16dp">
+
+            <LinearLayout
+                android:id="@+id/layoutServerList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+        </ScrollView>
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
 </LinearLayout>

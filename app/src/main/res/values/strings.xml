@@ -3,34 +3,156 @@
     <string name="app_name">P2P VPN</string>
     <string name="app_subtitle">Virtual LAN</string>
 
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_servers">Servers</string>
+    <string name="nav_chat">Chat</string>
+    <string name="nav_settings">Settings</string>
+
     <!-- Main screen -->
+    <string name="quick_connect">Quick Connect</string>
+    <string name="generate_key">Generate Key</string>
+    <string name="join_with_key">Join with Key</string>
     <string name="create_network">Create Network</string>
     <string name="join_network">Join Network</string>
     <string name="disconnect">Disconnect</string>
+    <string name="connect">Connect</string>
+    <string name="cancel">Cancel</string>
     <string name="network_id">Network ID</string>
     <string name="enter_network_id">Enter 6-character network ID</string>
     <string name="or_join_existing">or join existing</string>
     <string name="enter_6_chars">Enter 6 characters</string>
     <string name="copy">Copy</string>
     <string name="copied">Copied: %s</string>
+    <string name="connection_info">CONNECTION INFO</string>
+    <string name="server_label">Server</string>
+    <string name="speed_label">Speed</string>
+    <string name="ping_label">Ping</string>
+    <string name="ip_label">IP</string>
+    <string name="uptime_label">Uptime</string>
+    <string name="connect_first">Connect to a server first</string>
+    <string name="finding_best_server">Finding best server...</string>
+    <string name="invalid_key">Invalid key format</string>
+    <string name="paste_key_hint">Paste connection key...</string>
 
     <!-- Status messages -->
     <string name="status_disconnected">Disconnected</string>
-    <string name="status_connecting">Connecting…</string>
+    <string name="status_connecting">Connecting\u2026</string>
     <string name="status_connected">Connected</string>
     <string name="status_waiting_peers">Waiting for peers</string>
-    <string name="status_hint_disconnected">Tap to create or join a network</string>
-    <string name="status_creating">Creating network…</string>
-    <string name="status_joining">Joining…</string>
+    <string name="status_hint_disconnected">Tap Quick Connect or select a server</string>
+    <string name="status_creating">Creating network\u2026</string>
+    <string name="status_joining">Joining\u2026</string>
     <string name="status_network_created">Network: %s</string>
-    <string name="status_ip_connecting">IP: %s. Connecting to peers…</string>
+    <string name="status_ip_connecting">IP: %s. Connecting to peers\u2026</string>
     <string name="status_connected_msg">Connected!</string>
     <string name="status_tunnel_active">Tunnel active!</string>
     <string name="status_peer_disconnected">Peer disconnected</string>
     <string name="status_disconnected_msg">Disconnected</string>
     <string name="status_error">Error: %s</string>
 
-    <!-- Connection methods grid -->
+    <!-- Disconnect dialog -->
+    <string name="disconnect_confirm_title">Disconnect?</string>
+    <string name="disconnect_confirm_message">You will be disconnected from the current server. Active transfers will be interrupted.</string>
+
+    <!-- Connected screen -->
+    <string name="connected_title">Connected</string>
+    <string name="live_traffic">LIVE TRAFFIC</string>
+    <string name="upload_label">Upload</string>
+    <string name="download_label">Download</string>
+    <string name="generate_share_key">Generate Share Key</string>
+    <string name="your_share_key">YOUR SHARE KEY</string>
+    <string name="copy_key">Copy Key</string>
+    <string name="share_key">Share</string>
+    <string name="key_generated">Key generated successfully</string>
+    <string name="key_copied">Key copied to clipboard</string>
+    <string name="generate_key_first">Generate a key first</string>
+    <string name="enter_key_first">Enter a key first</string>
+    <string name="share_key_subject">VPN Connection Key</string>
+    <string name="share_key_body">Join my VPN network with this key:\n\n%s\n\nPaste this key in P2P VPN app to connect.</string>
+    <string name="share_via">Share via</string>
+    <string name="connecting_to_peer">Connecting to %s\u2026</string>
+
+    <!-- Server List -->
+    <string name="servers_title">VPN Servers</string>
+    <string name="servers_subtitle">Tap to connect instantly</string>
+    <string name="loading_servers">Loading servers\u2026</string>
+    <string name="search_servers">Search servers\u2026</string>
+    <string name="ping_all">Ping All</string>
+    <string name="pinging">Pinging\u2026</string>
+    <string name="ping_complete">Ping complete</string>
+    <string name="filter_all">All</string>
+    <string name="sort_by">Sort by:</string>
+    <string name="sort_score">Score</string>
+    <string name="sort_speed">Speed</string>
+    <string name="sort_ping">Ping</string>
+    <string name="server_count">%d servers available</string>
+    <string name="error_loading">Error: %s</string>
+    <string name="server_connecting">Connecting to %s\u2026</string>
+    <string name="server_connected">Connected to %s</string>
+    <string name="server_disconnected">Disconnected</string>
+
+    <!-- Chat -->
+    <string name="peer_name">Peer</string>
+    <string name="peer_online">Online</string>
+    <string name="peer_offline">Offline</string>
+    <string name="peer_typing">typing\u2026</string>
+    <string name="no_messages">No messages yet</string>
+    <string name="send_first_message">Send a message to start chatting</string>
+    <string name="message_hint">Type a message\u2026</string>
+    <string name="select_file">Select file</string>
+    <string name="chat">Chat</string>
+
+    <!-- Settings -->
+    <string name="settings">Settings</string>
+    <string name="settings_interface">INTERFACE</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_desc">App color scheme</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_amoled">AMOLED</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_accent_color">Accent Color</string>
+    <string name="settings_accent_desc">Main highlight color</string>
+    <string name="settings_font_size">Font Size</string>
+    <string name="settings_network">NETWORK</string>
+    <string name="settings_dns">DNS Servers</string>
+    <string name="settings_dns_desc">Custom DNS for VPN tunnel</string>
+    <string name="settings_dns_primary_hint">Primary DNS (e.g. 8.8.8.8)</string>
+    <string name="settings_dns_secondary_hint">Secondary DNS (e.g. 8.8.4.4)</string>
+    <string name="settings_mtu">MTU Size</string>
+    <string name="settings_mtu_hint">1200\u20131500 (default: 1400)</string>
+    <string name="settings_protocol">Protocol</string>
+    <string name="settings_protocol_desc">Connection protocol</string>
+    <string name="settings_servers_section">SERVERS</string>
+    <string name="settings_mirrors">API Mirror URLs</string>
+    <string name="settings_mirrors_desc">Access VPN Gate even when blocked</string>
+    <string name="settings_mirror_hint">http://mirror.example.com/api/</string>
+    <string name="settings_auto_connect">Auto Connect</string>
+    <string name="settings_auto_connect_desc">Connect to best server on app start</string>
+    <string name="settings_preferred_country">Preferred Country</string>
+    <string name="settings_about">ABOUT</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_github">View on GitHub</string>
+    <string name="settings_github_url">https://github.com</string>
+    <string name="settings_clear_cache">Clear Cache</string>
+    <string name="settings_saved">Save Settings</string>
+    <string name="settings_saved_toast">Settings saved</string>
+    <string name="add">Add</string>
+    <string name="clear">Clear</string>
+    <string name="mirror_added">Mirror added</string>
+    <string name="invalid_url">Invalid URL. Must start with http:// or https://</string>
+    <string name="clear_cache_confirm">Clear all cached data? Server list will be re-downloaded.</string>
+    <string name="cache_cleared">Cache cleared</string>
+    <string name="invalid_dns_primary">Invalid primary DNS format</string>
+    <string name="invalid_dns_secondary">Invalid secondary DNS format</string>
+
+    <!-- Network info -->
+    <string name="network_id_label">NETWORK ID</string>
+    <string name="your_ip">Your IP</string>
+    <string name="peers">Peers</string>
+
+    <!-- Connection methods -->
     <string name="method_firebase">Firebase</string>
     <string name="method_direct_ip">Direct IP</string>
     <string name="method_share_key">Share Key</string>
@@ -39,30 +161,25 @@
     <string name="method_settings">Settings</string>
     <string name="method_servers">Servers</string>
 
-    <!-- Servers -->
-    <string name="servers_title">VPN Servers</string>
-    <string name="servers_subtitle">Tap to connect instantly</string>
-    <string name="server_connecting">Connecting to %s…</string>
-    <string name="server_connected">Connected to %s</string>
-    <string name="server_disconnected">Disconnected</string>
-    <string name="server_type_vps">VPS</string>
-    <string name="server_type_vds">VDS</string>
-    <string name="server_type_dedicated">Dedicated</string>
+    <!-- VPN notification -->
+    <string name="vpn_notification_title">P2P VPN Active</string>
+    <string name="vpn_notification_text">Virtual network is running</string>
 
-    <!-- Network info -->
-    <string name="network_id_label">NETWORK ID</string>
-    <string name="your_ip">Your IP</string>
-    <string name="peers">Peers</string>
+    <!-- Misc -->
+    <string name="vpn_permission_denied">VPN permission denied</string>
+    <string name="connection_log">Connection Log</string>
+    <string name="waiting_for_connection">Waiting for connection\u2026</string>
+    <string name="stats">Stats</string>
+    <string name="manual_connect">Manual Connect</string>
+    <string name="manual_mode">Manual mode (no Firebase)</string>
+    <string name="copy_offer">Copy key</string>
+    <string name="paste_answer">Paste answer key</string>
 
-    <!-- Settings -->
-    <string name="settings">Settings</string>
+    <!-- Settings legacy -->
     <string name="settings_display_name">Display Name</string>
     <string name="settings_display_name_hint">Your name in the network</string>
-    <string name="settings_network">Network</string>
     <string name="settings_ip_prefix">Virtual IP Prefix</string>
     <string name="settings_ip_prefix_hint">e.g. 10.0.0</string>
-    <string name="settings_mtu">MTU Size</string>
-    <string name="settings_mtu_hint">1200–1500 (default: 1400)</string>
     <string name="settings_servers">Servers</string>
     <string name="settings_enable_turn">Enable TURN servers</string>
     <string name="settings_turn_hint">Required for cross-network connections</string>
@@ -71,32 +188,6 @@
     <string name="settings_custom_turn">Custom TURN server</string>
     <string name="settings_custom_turn_hint">turn:server:port</string>
     <string name="settings_appearance">Appearance</string>
-    <string name="settings_theme">Theme</string>
-    <string name="settings_theme_dark">Dark</string>
-    <string name="settings_theme_light">Light</string>
-    <string name="settings_theme_system">System</string>
     <string name="settings_logs">Logging</string>
     <string name="settings_show_logs">Show connection logs</string>
-    <string name="settings_about">About</string>
-    <string name="settings_version">Version</string>
-    <string name="settings_github">GitHub</string>
-    <string name="settings_github_url">https://github.com</string>
-    <string name="settings_saved">Save Settings</string>
-    <string name="settings_saved_toast">Settings saved</string>
-
-    <!-- VPN notification -->
-    <string name="vpn_notification_title">P2P VPN Active</string>
-    <string name="vpn_notification_text">Virtual network is running</string>
-
-    <!-- Misc -->
-    <string name="vpn_permission_denied">VPN permission denied</string>
-    <string name="connection_log">Connection Log</string>
-    <string name="clear">Clear</string>
-    <string name="waiting_for_connection">Waiting for connection…</string>
-    <string name="chat">Chat</string>
-    <string name="stats">Stats</string>
-    <string name="manual_connect">Manual Connect</string>
-    <string name="manual_mode">Manual mode (no Firebase)</string>
-    <string name="copy_offer">Copy key</string>
-    <string name="paste_answer">Paste answer key</string>
 </resources>
