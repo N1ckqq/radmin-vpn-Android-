@@ -341,9 +341,7 @@ class ChatActivity : AppCompatActivity() {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    maxWidth = (resources.displayMetrics.widthPixels * 0.75).toInt()
-                }
+                )
             }
 
             // File indicator
