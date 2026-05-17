@@ -1,20 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#2979FF</color>
-    <color name="primary_dark">#1565C0</color>
-    <color name="accent">#00E676</color>
-    <color name="background">#121218</color>
-    <color name="surface">#1E1E2E</color>
-    <color name="card">#252536</color>
-    <color name="card_border">#3D3D5C</color>
+    <!-- Primary colors -->
+    <color name="accent_blue">#2979FF</color>
+    <color name="accent_green">#00E676</color>
+    <color name="accent_purple">#7C4DFF</color>
+    <color name="accent_red">#FF5252</color>
+    <color name="accent_orange">#FF9800</color>
+
+    <!-- Background colors -->
+    <color name="bg_primary">#0D0D14</color>
+    <color name="bg_secondary">#121218</color>
+    <color name="bg_card">#1A1A2E</color>
+
+    <!-- Card colors -->
+    <color name="card_bg">#1A1A2E</color>
+    <color name="card_stroke">#2D2D44</color>
+
+    <!-- Text colors -->
     <color name="text_primary">#E0E0E0</color>
-    <color name="text_secondary">#9E9EAE</color>
-    <color name="text_hint">#6E6E7E</color>
-    <color name="status_bar">#0D0D14</color>
-    <color name="connected_green">#00E676</color>
-    <color name="disconnected_gray">#6E6E7E</color>
-    <color name="connecting_yellow">#FFC107</color>
-    <color name="waiting_blue">#29B6F6</color>
-    <color name="error_red">#FF5252</color>
-    <color name="divider">#2A2A3E</color>
+    <color name="text_secondary">#6E6E7E</color>
+    <color name="text_tertiary">#4E4E5E</color>
+    <color name="text_white">#FFFFFF</color>
+
+    <!-- Status colors -->
+    <color name="status_connected">#00E676</color>
+    <color name="status_connecting">#FF9800</color>
+    <color name="status_disconnected">#FF5252</color>
+
+    <!-- Chat colors -->
+    <color name="chat_bubble_mine">#1A3A5E</color>
+    <color name="chat_bubble_peer">#252536</color>
 </resources>

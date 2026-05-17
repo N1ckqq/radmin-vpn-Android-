@@ -1,122 +1,334 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F5F5">
+    android:orientation="vertical"
+    android:background="@drawable/bg_gradient_dark"
+    android:fitsSystemWindows="true">
 
-    <com.google.android.material.appbar.AppBarLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:elevation="0dp"
-        app:elevation="0dp">
-
-        <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/toolbar"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorPrimary"
-            app:title="P2P Chat"
-            app:titleTextColor="#FFFFFF"
-            app:subtitle="Encrypted via WebRTC"
-            app:subtitleTextColor="#B3FFFFFF"
-            app:navigationIcon="@android:drawable/ic_menu_revert"
-            app:navigationIconTint="#FFFFFF" />
-
-    </com.google.android.material.appbar.AppBarLayout>
-
+    <!-- Chat Toolbar -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        android:layout_height="64dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:background="#0D0D14">
 
-        <!-- Connection Status Banner -->
+        <FrameLayout
+            android:id="@+id/btnBack"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@drawable/bg_nav_item"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:src="@android:drawable/ic_menu_revert"
+                app:tint="#E0E0E0" />
+
+        </FrameLayout>
+
         <LinearLayout
-            android:id="@+id/layoutStatus"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="8dp"
-            android:gravity="center_vertical"
-            android:background="#E3F2FD">
-
-            <View
-                android:id="@+id/viewConnectionDot"
-                android:layout_width="8dp"
-                android:layout_height="8dp"
-                android:background="@drawable/circle_status"
-                android:backgroundTint="#4CAF50"
-                android:layout_marginEnd="8dp" />
-
-            <TextView
-                android:id="@+id/tvConnectionStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Connected"
-                android:textSize="12sp"
-                android:textColor="#1565C0" />
-
-        </LinearLayout>
-
-        <!-- Messages List -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvMessages"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
             android:layout_weight="1"
-            android:padding="8dp"
-            android:clipToPadding="false" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginStart="12dp">
 
-        <!-- Input Area -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardCornerRadius="0dp"
-            app:cardElevation="8dp">
+            <!-- Peer Avatar -->
+            <FrameLayout
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_card_dark">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center"
+                    android:src="@android:drawable/ic_menu_myplaces"
+                    app:tint="#2979FF" />
+
+            </FrameLayout>
 
             <LinearLayout
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:padding="8dp"
-                android:gravity="center_vertical">
+                android:orientation="vertical"
+                android:layout_marginStart="10dp">
 
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
-                    app:boxCornerRadiusTopStart="24dp"
-                    app:boxCornerRadiusTopEnd="24dp"
-                    app:boxCornerRadiusBottomStart="24dp"
-                    app:boxCornerRadiusBottomEnd="24dp"
-                    app:boxBackgroundMode="outline"
-                    android:hint="Type a message">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etMessage"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="textShortMessage"
-                        android:maxLines="4"
-                        android:textSize="14sp" />
-
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.floatingactionbutton.FloatingActionButton
-                    android:id="@+id/fabSend"
+                <TextView
+                    android:id="@+id/tvPeerName"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:src="@android:drawable/ic_menu_send"
-                    app:fabSize="mini"
-                    app:tint="#FFFFFF"
-                    app:backgroundTint="?attr/colorPrimary" />
+                    android:text="@string/peer_name"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="#E0E0E0" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <View
+                        android:id="@+id/viewPeerStatus"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:background="@drawable/bg_connection_orb_connected" />
+
+                    <TextView
+                        android:id="@+id/tvPeerStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/peer_online"
+                        android:textSize="11sp"
+                        android:textColor="#00E676"
+                        android:layout_marginStart="6dp" />
+
+                </LinearLayout>
 
             </LinearLayout>
 
-        </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
+
+        <!-- File Attachment Counter -->
+        <FrameLayout
+            android:id="@+id/btnAttachMenu"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@drawable/bg_nav_item"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:src="@android:drawable/ic_menu_info_details"
+                app:tint="#6E6E7E" />
+
+        </FrameLayout>
 
     </LinearLayout>
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+    <!-- Typing Indicator -->
+    <LinearLayout
+        android:id="@+id/layoutTypingIndicator"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingVertical="6dp"
+        android:visibility="gone">
+
+        <View
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:background="@drawable/bg_connection_orb"
+            android:layout_marginEnd="4dp" />
+
+        <View
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:background="@drawable/bg_connection_orb"
+            android:layout_marginEnd="4dp" />
+
+        <View
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:background="@drawable/bg_connection_orb" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/peer_typing"
+            android:textSize="11sp"
+            android:textColor="#6E6E7E"
+            android:layout_marginStart="8dp" />
+
+    </LinearLayout>
+
+    <!-- Messages Area -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvMessages"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp" />
+
+        <!-- Empty State -->
+        <LinearLayout
+            android:id="@+id/layoutEmptyState"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <ImageView
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:src="@android:drawable/ic_menu_send"
+                app:tint="#2D2D44"
+                android:alpha="0.5" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/no_messages"
+                android:textSize="16sp"
+                android:textColor="#4E4E5E"
+                android:layout_marginTop="12dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/send_first_message"
+                android:textSize="12sp"
+                android:textColor="#3D3D5C"
+                android:layout_marginTop="4dp" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+    <!-- File Attachment Preview -->
+    <LinearLayout
+        android:id="@+id/layoutAttachmentPreview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="8dp"
+        android:background="#1A1A2E"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@android:drawable/ic_menu_recent_history"
+            app:tint="#2979FF" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginStart="10dp">
+
+            <TextView
+                android:id="@+id/tvAttachmentName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="filename.pdf"
+                android:textSize="13sp"
+                android:textColor="#E0E0E0"
+                android:maxLines="1"
+                android:ellipsize="middle" />
+
+            <TextView
+                android:id="@+id/tvAttachmentSize"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="2.4 MB"
+                android:textSize="11sp"
+                android:textColor="#6E6E7E" />
+
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/btnRemoveAttachment"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            app:tint="#FF5252"
+            android:padding="4dp"
+            android:clickable="true"
+            android:focusable="true" />
+
+    </LinearLayout>
+
+    <!-- Message Input Area -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="10dp"
+        android:background="#0D0D14">
+
+        <!-- Attach File Button -->
+        <FrameLayout
+            android:id="@+id/btnAttachFile"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@drawable/bg_nav_item"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:src="@android:drawable/ic_menu_upload"
+                app:tint="#6E6E7E" />
+
+        </FrameLayout>
+
+        <!-- Text Input -->
+        <EditText
+            android:id="@+id/etMessage"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:minHeight="42dp"
+            android:maxHeight="120dp"
+            android:background="@drawable/bg_input_field"
+            android:hint="@string/message_hint"
+            android:textColorHint="#4E4E5E"
+            android:textColor="#E0E0E0"
+            android:textSize="14sp"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="10dp"
+            android:inputType="textMultiLine"
+            android:layout_marginHorizontal="8dp" />
+
+        <!-- Send Button -->
+        <FrameLayout
+            android:id="@+id/btnSend"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@drawable/bg_button_primary"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:src="@android:drawable/ic_menu_send"
+                app:tint="#FFFFFF" />
+
+        </FrameLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

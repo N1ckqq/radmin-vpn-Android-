@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="tvServerPing" type="id" />
+    <item name="tvServerSpeed" type="id" />
+    <item name="tvServerName" type="id" />
+</resources>

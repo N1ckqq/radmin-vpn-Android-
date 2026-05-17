@@ -42,4 +42,31 @@
         <item name="android:textSize">12sp</item>
         <item name="backgroundTint">#252536</item>
     </style>
+
+    <style name="Theme.RadminVPN.Dialog" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
+        <item name="colorSurface">#1A1A2E</item>
+        <item name="colorOnSurface">#E0E0E0</item>
+        <item name="materialAlertDialogTitleTextStyle">@style/DialogTitleStyle</item>
+        <item name="materialAlertDialogBodyTextStyle">@style/DialogBodyStyle</item>
+        <item name="buttonBarPositiveButtonStyle">@style/DialogPositiveButton</item>
+        <item name="buttonBarNegativeButtonStyle">@style/DialogNegativeButton</item>
+    </style>
+
+    <style name="DialogTitleStyle" parent="MaterialAlertDialog.MaterialComponents.Title.Text">
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textSize">18sp</item>
+    </style>
+
+    <style name="DialogBodyStyle" parent="MaterialAlertDialog.MaterialComponents.Body.Text">
+        <item name="android:textColor">#9E9EAE</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="DialogPositiveButton" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+        <item name="android:textColor">#2979FF</item>
+    </style>
+
+    <style name="DialogNegativeButton" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+        <item name="android:textColor">#6E6E7E</item>
+    </style>
 </resources>
