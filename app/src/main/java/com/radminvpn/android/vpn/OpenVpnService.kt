@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import android.os.Build
@@ -12,35 +13,27 @@ import android.util.Base64
 import androidx.core.app.NotificationCompat
 import com.radminvpn.android.ui.MainActivity
 import com.radminvpn.android.util.VpnLog
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.InetAddress
-import java.net.InetSocketAddress
-import java.net.Socket
-import java.nio.ByteBuffer
-import java.util.concurrent.atomic.AtomicBoolean
+import de.blinkt.openvpn.VpnProfile
+import de.blinkt.openvpn.core.ConfigParser
+import de.blinkt.openvpn.core.OpenVPNService
+import de.blinkt.openvpn.core.ProfileManager
+import de.blinkt.openvpn.core.VPNLaunchHelper
+import de.blinkt.openvpn.core.VpnStatus
+import java.io.StringReader
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * VPN Service that creates a TUN interface and forwards raw IP packets
- * to the remote server via a protected UDP/TCP socket.
+ * OpenVPN Service that uses the ics-openvpn library (de.blinkt.openvpn)
+ * to establish a real OpenVPN connection with full protocol support
+ * (TLS, encryption, authentication).
  *
- * IMPORTANT: VPN Gate servers require the full OpenVPN protocol (TLS, HMAC, encryption).
- * This simplified service creates the TUN and attempts a raw packet tunnel.
- * For servers that do NOT support raw tunneling, the connection will establish
- * the TUN interface (changing routes/DNS) but may not pass traffic through
- * unless the server supports raw IP forwarding.
- *
- * The service correctly:
- * - Requests VPN permission via VpnService.prepare()
- * - Creates a TUN interface with proper routes and DNS
- * - Protects the tunnel socket from VPN routing loops
- * - Handles connect/disconnect lifecycle
- * - Reports real byte counters
+ * This properly:
+ * - Parses .ovpn config from VPN Gate (Base64)
+ * - Creates a VpnProfile using ConfigParser
+ * - Launches the real OpenVPN3 engine via VPNLaunchHelper
+ * - Reports real byte counters from the connection
  */
-class OpenVpnService : VpnService() {
+class OpenVpnService : VpnService(), VpnStatus.StateListener, VpnStatus.ByteCountListener {
 
     companion object {
         private const val TAG = "OpenVPN"
@@ -64,14 +57,6 @@ class OpenVpnService : VpnService() {
             private set
     }
 
-    private var vpnInterface: ParcelFileDescriptor? = null
-    private var sendThread: Thread? = null
-    private var receiveThread: Thread? = null
-    private val running = AtomicBoolean(false)
-
-    private var tunnelSocket: DatagramSocket? = null
-    private var tcpSocket: Socket? = null
-
     val bytesSent = AtomicLong(0)
     val bytesReceived = AtomicLong(0)
 
@@ -79,6 +64,8 @@ class OpenVpnService : VpnService() {
         super.onCreate()
         instance = this
         createNotificationChannel()
+        VpnStatus.addStateListener(this)
+        VpnStatus.addByteCountListener(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -97,177 +84,55 @@ class OpenVpnService : VpnService() {
     }
 
     override fun onDestroy() {
-        disconnect()
+        VpnStatus.removeStateListener(this)
+        VpnStatus.removeByteCountListener(this)
         instance = null
         super.onDestroy()
     }
 
     private fun connect(configBase64: String, serverName: String, serverIp: String) {
-        if (running.get()) {
-            VpnLog.w(TAG, "Already connected, disconnecting first...")
-            disconnect()
-        }
-
         currentServerName = serverName
         currentServerIp = serverIp
-        VpnLog.i(TAG, "Connecting to $serverName ($serverIp)...")
+        VpnLog.i(TAG, "Connecting to $serverName ($serverIp) using OpenVPN library...")
 
-        startForeground(NOTIFICATION_ID, buildNotification("Connecting to $serverName..."))
+        try {
+            // Decode the Base64 .ovpn config
+            val configBytes = Base64.decode(configBase64, Base64.DEFAULT)
+            val configString = String(configBytes)
 
-        sendThread = Thread {
-            var localSocket: DatagramSocket? = null
-            try {
-                // Decode and parse the OpenVPN config
-                val configBytes = Base64.decode(configBase64, Base64.DEFAULT)
-                val config = String(configBytes)
-                val parsed = parseOvpnConfig(config)
+            // Parse the OpenVPN config using ics-openvpn's ConfigParser
+            val configParser = ConfigParser()
+            configParser.parseConfig(StringReader(configString))
 
-                if (parsed == null) {
-                    VpnLog.e(TAG, "Failed to parse OpenVPN config")
-                    stopSelf()
-                    return@Thread
-                }
+            // Convert parsed config to a VpnProfile
+            val profile = configParser.convertProfile()
+            profile.mName = serverName
 
-                VpnLog.i(TAG, "Config parsed: ${parsed.remoteHost}:${parsed.remotePort} (${parsed.proto})")
+            // Save the profile
+            ProfileManager.getInstance(this).addProfile(profile)
 
-                // Resolve server address BEFORE creating TUN (so DNS works)
-                val serverAddress = InetAddress.getByName(parsed.remoteHost)
-                VpnLog.i(TAG, "Server resolved: ${serverAddress.hostAddress}")
+            // Launch the VPN connection using the real OpenVPN engine
+            VPNLaunchHelper.startOpenVpn(profile, this)
 
-                // Create protected UDP socket to the VPN server
-                val socket = DatagramSocket()
-                protect(socket) // CRITICAL: exclude from VPN routing
-                socket.soTimeout = 5000 // 5s timeout for receives
-                socket.connect(InetSocketAddress(serverAddress, parsed.remotePort))
-                tunnelSocket = socket
-                localSocket = socket
-
-                VpnLog.i(TAG, "Protected socket connected to ${serverAddress.hostAddress}:${parsed.remotePort}")
-
-                // Build TUN interface
-                val builder = Builder()
-                    .setSession("VPN - $serverName")
-                    .addAddress("10.8.0.2", 24)
-                    .addDnsServer("8.8.8.8")
-                    .addDnsServer("8.8.4.4")
-                    .setMtu(1400)
-                    .setBlocking(true)
-
-                // Route all traffic through VPN except the VPN server itself
-                // This prevents routing loops
-                val serverIpStr = serverAddress.hostAddress ?: parsed.remoteHost
-                // Add two routes that cover 0.0.0.0/0 but exclude the server IP
-                builder.addRoute("0.0.0.0", 0)
-                // Exclude the VPN server's IP from the tunnel
-                // Android handles this via protect(socket) already
-
-                vpnInterface = builder.establish()
-                if (vpnInterface == null) {
-                    VpnLog.e(TAG, "Failed to establish VPN interface")
-                    socket.close()
-                    stopSelf()
-                    return@Thread
-                }
-
-                running.set(true)
-                isConnected = true
-                VpnLog.success(TAG, "VPN interface established! Connected to $serverName")
-                updateNotification("Connected to $serverName")
-
-                val fd = vpnInterface!!.fileDescriptor
-                val tunInput = FileInputStream(fd)
-
-                // Send thread: TUN → Server
-                val sendBuffer = ByteArray(1500)
-                while (running.get()) {
-                    try {
-                        val length = tunInput.read(sendBuffer)
-                        if (length > 0 && running.get()) {
-                            val packet = DatagramPacket(sendBuffer, length)
-                            socket.send(packet)
-                            bytesSent.addAndGet(length.toLong())
-                        }
-                    } catch (e: java.io.InterruptedIOException) {
-                        // Read timeout - just continue
-                        continue
-                    } catch (e: Exception) {
-                        if (running.get()) {
-                            VpnLog.e(TAG, "Send error: ${e.message}")
-                        }
-                        break
-                    }
-                }
-            } catch (e: Exception) {
-                VpnLog.e(TAG, "Connection error: ${e.message}")
-            } finally {
-                if (!running.get()) {
-                    isConnected = false
-                }
-            }
-        }.apply {
-            name = "VPN-Send"
-            isDaemon = true
-            start()
-        }
-
-        // Receive thread: Server → TUN
-        receiveThread = Thread {
-            // Wait for tunnel to be established
-            var attempts = 0
-            while (!running.get() && attempts < 50) {
-                Thread.sleep(100)
-                attempts++
-            }
-            if (!running.get()) return@Thread
-
-            val socket = tunnelSocket ?: return@Thread
-            val fd = vpnInterface?.fileDescriptor ?: return@Thread
-            val tunOutput = FileOutputStream(fd)
-            val recvBuffer = ByteArray(1500)
-
-            while (running.get()) {
-                try {
-                    val packet = DatagramPacket(recvBuffer, recvBuffer.size)
-                    socket.receive(packet)
-                    if (packet.length > 0 && running.get()) {
-                        tunOutput.write(recvBuffer, 0, packet.length)
-                        bytesReceived.addAndGet(packet.length.toLong())
-                    }
-                } catch (e: java.net.SocketTimeoutException) {
-                    // Receive timeout - just continue polling
-                    continue
-                } catch (e: Exception) {
-                    if (running.get()) {
-                        VpnLog.e(TAG, "Receive error: ${e.message}")
-                    }
-                    break
-                }
-            }
-        }.apply {
-            name = "VPN-Receive"
-            isDaemon = true
-            start()
+            VpnLog.success(TAG, "OpenVPN connection initiated for $serverName")
+        } catch (e: Exception) {
+            VpnLog.e(TAG, "Failed to start OpenVPN: ${e.message}")
+            isConnected = false
         }
     }
 
     fun disconnect() {
         VpnLog.i(TAG, "Disconnecting...")
-        running.set(false)
+
+        // Send disconnect to the OpenVPN management interface
+        val profile = ProfileManager.getInstance(this).getProfileByName(currentServerName)
+        if (profile != null) {
+            // The OpenVPN core service handles disconnect
+            val mgmt = de.blinkt.openvpn.core.OpenVPNManagement.getInstance()
+            mgmt?.stopVPN(false)
+        }
+
         isConnected = false
-
-        sendThread?.interrupt()
-        sendThread = null
-        receiveThread?.interrupt()
-        receiveThread = null
-
-        try { tunnelSocket?.close() } catch (_: Exception) {}
-        tunnelSocket = null
-        try { tcpSocket?.close() } catch (_: Exception) {}
-        tcpSocket = null
-
-        try { vpnInterface?.close() } catch (_: Exception) {}
-        vpnInterface = null
-
         currentServerName = ""
         currentServerIp = ""
         bytesSent.set(0)
@@ -278,65 +143,41 @@ class OpenVpnService : VpnService() {
         VpnLog.i(TAG, "Disconnected")
     }
 
-    fun getShareableKey(): String? {
-        return if (isConnected && currentServerIp.isNotEmpty()) {
-            val info = "VPNGATE:$currentServerIp:$currentServerName"
-            Base64.encodeToString(info.toByteArray(), Base64.NO_WRAP)
-        } else null
-    }
+    // ===== VpnStatus.StateListener =====
 
-    private fun parseOvpnConfig(config: String): OvpnConfig? {
-        var remoteHost = ""
-        var remotePort = 1194
-        var proto = "udp"
-
-        for (line in config.lines()) {
-            val trimmed = line.trim()
-            when {
-                trimmed.startsWith("remote ") -> {
-                    val parts = trimmed.split("\\s+".toRegex())
-                    if (parts.size >= 2) remoteHost = parts[1]
-                    if (parts.size >= 3) remotePort = parts[2].toIntOrNull() ?: 1194
-                }
-                trimmed.startsWith("proto ") -> {
-                    proto = trimmed.substringAfter("proto ").trim()
-                }
+    override fun updateState(state: String?, logmessage: String?, localizedResId: Int, level: VpnStatus.ConnectionStatus?, Intent: Intent?) {
+        when (level) {
+            VpnStatus.ConnectionStatus.LEVEL_CONNECTED -> {
+                isConnected = true
+                VpnLog.success(TAG, "CONNECTED to $currentServerName")
+            }
+            VpnStatus.ConnectionStatus.LEVEL_NOTCONNECTED -> {
+                isConnected = false
+                VpnLog.i(TAG, "Disconnected")
+            }
+            VpnStatus.ConnectionStatus.LEVEL_CONNECTING_SERVER_REPLIED -> {
+                VpnLog.i(TAG, "Server replied, authenticating...")
+            }
+            VpnStatus.ConnectionStatus.LEVEL_AUTH_FAILED -> {
+                isConnected = false
+                VpnLog.e(TAG, "Authentication failed")
+            }
+            else -> {
+                VpnLog.i(TAG, "State: $state - $logmessage")
             }
         }
-
-        return if (remoteHost.isNotEmpty()) {
-            OvpnConfig(remoteHost, remotePort, proto, config)
-        } else null
     }
 
-    private data class OvpnConfig(
-        val remoteHost: String,
-        val remotePort: Int,
-        val proto: String,
-        val fullConfig: String
-    )
+    override fun setConnectedVPN(uuid: String?) {}
 
-    private fun buildNotification(text: String): Notification {
-        val intent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+    // ===== VpnStatus.ByteCountListener =====
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Radmin VPN")
-            .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_lock_lock)
-            .setContentIntent(pendingIntent)
-            .setOngoing(true)
-            .build()
+    override fun updateByteCount(inBytes: Long, outBytes: Long, diffIn: Long, diffOut: Long) {
+        bytesReceived.set(inBytes)
+        bytesSent.set(outBytes)
     }
 
-    private fun updateNotification(text: String) {
-        val notification = buildNotification(text)
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(NOTIFICATION_ID, notification)
-    }
+    // ===== Notification =====
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -350,5 +191,12 @@ class OpenVpnService : VpnService() {
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
         }
+    }
+
+    fun getShareableKey(): String? {
+        return if (isConnected && currentServerIp.isNotEmpty()) {
+            val info = "VPNGATE:$currentServerIp:$currentServerName"
+            Base64.encodeToString(info.toByteArray(), Base64.NO_WRAP)
+        } else null
     }
 }

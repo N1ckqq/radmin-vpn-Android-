@@ -63,4 +63,7 @@ dependencies {
 
     // HTTP client for VPN Gate API
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+
+    // OpenVPN library (ics-openvpn via JitPack)
+    implementation 'com.github.nicholasgasior:ics-openvpn:0.7.33'
 }
