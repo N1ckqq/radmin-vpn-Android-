@@ -21,6 +21,7 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.radminvpn.android.R
 import com.radminvpn.android.databinding.ActivityConnectedBinding
+import com.radminvpn.android.vpn.OpenVpnService
 import com.radminvpn.android.vpn.VpnGateRepository
 import kotlinx.coroutines.launch
 
@@ -304,6 +305,12 @@ class ConnectedActivity : AppCompatActivity() {
     }
 
     private fun performDisconnect() {
+        // Stop VPN service
+        val intent = Intent(this, OpenVpnService::class.java).apply {
+            action = OpenVpnService.ACTION_DISCONNECT
+        }
+        startService(intent)
+
         // Animate orb shrink
         binding.viewConnectedOrb.animate()
             .scaleX(0f).scaleY(0f).alpha(0f)
@@ -339,14 +346,15 @@ class ConnectedActivity : AppCompatActivity() {
     private fun startStatsUpdater() {
         val statsRunnable = object : Runnable {
             override fun run() {
-                // Simulate realistic traffic
-                val uploadDelta = (Math.random() * 80000 + 5000).toLong()
-                val downloadDelta = (Math.random() * 200000 + 10000).toLong()
-                totalUpload += uploadDelta
-                totalDownload += downloadDelta
+                // Read real traffic stats from VPN service
+                val service = OpenVpnService.instance
+                if (service != null && OpenVpnService.isConnected) {
+                    totalUpload = service.bytesSent.get()
+                    totalDownload = service.bytesReceived.get()
+                }
 
-                binding.tvUploadSpeed.text = formatSpeed(uploadDelta)
-                binding.tvDownloadSpeed.text = formatSpeed(downloadDelta)
+                binding.tvUploadSpeed.text = formatSpeed(totalUpload)
+                binding.tvDownloadSpeed.text = formatSpeed(totalDownload)
                 binding.tvUploadTotal.text = "Total: ${formatBytes(totalUpload)}"
                 binding.tvDownloadTotal.text = "Total: ${formatBytes(totalDownload)}"
 

@@ -24,16 +24,25 @@ object VpnGateRepository {
 
     // Main URLs + mirrors for access without VPN
     private val API_URLS = listOf(
-        "http://www.vpngate.net/api/iphone/",
         "https://www.vpngate.net/api/iphone/",
+        "http://www.vpngate.net/api/iphone/",
         "http://vpngate.net/api/iphone/",
-        // Mirrors for blocked regions
-        "http://public-vpn.com/api/iphone/",
-        "https://vpngate-mirrors.github.io/api/iphone/",
-        "http://103.47.78.180/api/iphone/",
+        // Official VPN Gate mirror servers
         "http://219.100.37.27/api/iphone/",
         "http://219.100.37.18/api/iphone/",
-        "http://219.100.37.24/api/iphone/"
+        "http://219.100.37.24/api/iphone/",
+        "http://219.100.37.25/api/iphone/",
+        "http://219.100.37.26/api/iphone/",
+        "http://219.100.37.16/api/iphone/",
+        "http://219.100.37.17/api/iphone/",
+        "http://219.100.37.20/api/iphone/",
+        "http://219.100.37.21/api/iphone/",
+        "http://219.100.37.22/api/iphone/",
+        "http://219.100.37.23/api/iphone/",
+        // Community mirrors
+        "http://public-vpn.com/api/iphone/",
+        "https://vpngate-mirrors.github.io/api/iphone/",
+        "http://103.47.78.180/api/iphone/"
     )
 
     // User-added custom mirror URLs

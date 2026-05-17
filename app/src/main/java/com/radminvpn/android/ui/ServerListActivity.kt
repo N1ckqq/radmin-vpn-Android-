@@ -4,6 +4,8 @@ import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.content.Intent
 import android.graphics.Color
+import android.net.VpnService
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -22,6 +24,7 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
@@ -29,6 +32,7 @@ import com.google.android.material.card.MaterialCardView
 import com.radminvpn.android.R
 import com.radminvpn.android.databinding.ActivityServerListBinding
 import com.radminvpn.android.model.VpnGateServer
+import com.radminvpn.android.vpn.OpenVpnService
 import com.radminvpn.android.vpn.VpnGateRepository
 import kotlinx.coroutines.launch
 
@@ -43,6 +47,20 @@ class ServerListActivity : AppCompatActivity() {
     private var isPinging = false
 
     enum class SortMode { SCORE, SPEED, PING }
+
+    // Pending server for VPN permission flow
+    private var pendingServer: VpnGateServer? = null
+
+    private val vpnPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            pendingServer?.let { startVpnAndNavigate(it) }
+        } else {
+            Toast.makeText(this, "VPN permission denied", Toast.LENGTH_SHORT).show()
+        }
+        pendingServer = null
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -459,6 +477,30 @@ class ServerListActivity : AppCompatActivity() {
     // ===== CONNECT =====
 
     private fun connectToServer(server: VpnGateServer) {
+        val vpnIntent = VpnService.prepare(this)
+        if (vpnIntent != null) {
+            pendingServer = server
+            vpnPermissionLauncher.launch(vpnIntent)
+        } else {
+            startVpnAndNavigate(server)
+        }
+    }
+
+    private fun startVpnAndNavigate(server: VpnGateServer) {
+        // Start the VPN service
+        val serviceIntent = Intent(this, OpenVpnService::class.java).apply {
+            action = OpenVpnService.ACTION_CONNECT
+            putExtra(OpenVpnService.EXTRA_CONFIG_BASE64, server.openVpnConfigBase64)
+            putExtra(OpenVpnService.EXTRA_SERVER_NAME, server.hostName)
+            putExtra(OpenVpnService.EXTRA_SERVER_IP, server.ip)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
+
+        // Navigate to ConnectedActivity
         val intent = Intent(this, ConnectedActivity::class.java).apply {
             putExtra("server_name", server.hostName)
             putExtra("server_ip", server.ip)

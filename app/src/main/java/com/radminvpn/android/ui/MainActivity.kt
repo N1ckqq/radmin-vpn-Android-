@@ -7,6 +7,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.VpnService
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -17,12 +19,15 @@ import android.view.animation.AnimationUtils
 import android.view.animation.OvershootInterpolator
 import android.widget.EditText
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.radminvpn.android.R
 import com.radminvpn.android.databinding.ActivityMainBinding
+import com.radminvpn.android.model.VpnGateServer
+import com.radminvpn.android.vpn.OpenVpnService
 import com.radminvpn.android.vpn.VpnGateRepository
 import kotlinx.coroutines.launch
 
@@ -51,6 +56,24 @@ class MainActivity : AppCompatActivity() {
     private var currentServerCountry = ""
     private var currentServerSpeed = 0L
     private var currentServerPing = 0
+
+    // Pending server for VPN permission flow
+    private var pendingServer: VpnGateServer? = null
+
+    private val vpnPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            pendingServer?.let { startVpnConnection(it) }
+        } else {
+            isConnecting = false
+            updateUiState()
+            stopAllAnimations()
+            startIdleOrbAnimation()
+            Toast.makeText(this, "VPN permission denied", Toast.LENGTH_SHORT).show()
+        }
+        pendingServer = null
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -392,10 +415,9 @@ class MainActivity : AppCompatActivity() {
                     currentServerSpeed = server.speed
                     currentServerPing = server.ping
 
-                    // Simulate connection delay
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        onConnectionSuccess()
-                    }, 2000)
+                    runOnUiThread {
+                        requestVpnPermissionAndConnect(server)
+                    }
                 }.onFailure { error ->
                     runOnUiThread {
                         onConnectionFailed(error.message ?: "Unknown error")
@@ -407,6 +429,45 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun requestVpnPermissionAndConnect(server: VpnGateServer) {
+        val vpnIntent = VpnService.prepare(this)
+        if (vpnIntent != null) {
+            pendingServer = server
+            vpnPermissionLauncher.launch(vpnIntent)
+        } else {
+            startVpnConnection(server)
+        }
+    }
+
+    private fun startVpnConnection(server: VpnGateServer) {
+        val intent = Intent(this, OpenVpnService::class.java).apply {
+            action = OpenVpnService.ACTION_CONNECT
+            putExtra(OpenVpnService.EXTRA_CONFIG_BASE64, server.openVpnConfigBase64)
+            putExtra(OpenVpnService.EXTRA_SERVER_NAME, server.hostName)
+            putExtra(OpenVpnService.EXTRA_SERVER_IP, server.ip)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+
+        // Check connection status after delay
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (OpenVpnService.isConnected) {
+                onConnectionSuccess()
+            } else {
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (OpenVpnService.isConnected) {
+                        onConnectionSuccess()
+                    } else {
+                        onConnectionFailed("Failed to establish VPN tunnel")
+                    }
+                }, 3000)
+            }
+        }, 2000)
     }
 
     private fun onConnectionSuccess() {
@@ -452,6 +513,12 @@ class MainActivity : AppCompatActivity() {
         connectionStartTime = 0L
         totalUpload = 0L
         totalDownload = 0L
+
+        // Stop VPN service
+        val intent = Intent(this, OpenVpnService::class.java).apply {
+            action = OpenVpnService.ACTION_DISCONNECT
+        }
+        startService(intent)
 
         stopAllAnimations()
         startIdleOrbAnimation()
@@ -556,14 +623,15 @@ class MainActivity : AppCompatActivity() {
         val statsRunnable = object : Runnable {
             override fun run() {
                 if (isConnected) {
-                    // Simulate traffic
-                    val uploadDelta = (Math.random() * 50000).toLong()
-                    val downloadDelta = (Math.random() * 150000).toLong()
-                    totalUpload += uploadDelta
-                    totalDownload += downloadDelta
+                    // Read real stats from VPN service
+                    val service = OpenVpnService.instance
+                    if (service != null) {
+                        totalUpload = service.bytesSent.get()
+                        totalDownload = service.bytesReceived.get()
+                    }
 
-                    binding.tvUploadSpeed.text = formatSpeed(uploadDelta)
-                    binding.tvDownloadSpeed.text = formatSpeed(downloadDelta)
+                    binding.tvUploadSpeed.text = formatSpeed(totalUpload)
+                    binding.tvDownloadSpeed.text = formatSpeed(totalDownload)
                     binding.tvUploadTotal.text = formatBytes(totalUpload)
                     binding.tvDownloadTotal.text = formatBytes(totalDownload)
                 }
