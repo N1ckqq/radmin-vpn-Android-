@@ -338,12 +338,10 @@ class ChatActivity : AppCompatActivity() {
                     else R.drawable.bg_chat_bubble_peer
                 )
                 setPadding(14.dp(), 10.dp(), 14.dp(), 10.dp())
-                layoutParams = LinearLayout.LayoutParams(
+                layoutParams = FrameLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    maxWidth = (resources.displayMetrics.widthPixels * 0.75).toInt()
-                }
+                )
             }
 
             // File indicator
