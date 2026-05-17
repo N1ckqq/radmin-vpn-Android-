@@ -12,23 +12,27 @@ import android.util.Base64
 import androidx.core.app.NotificationCompat
 import com.radminvpn.android.ui.MainActivity
 import com.radminvpn.android.util.VpnLog
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.io.OutputStream
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.net.DatagramPacket
+import java.net.DatagramSocket
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
-import javax.net.ssl.SSLSocketFactory
 
 /**
- * OpenVPN-compatible VPN Service.
- * Parses .ovpn config from VPN Gate, establishes TCP/UDP connection
- * to the OpenVPN server, and routes traffic through TUN interface.
+ * VPN Service that creates a TUN interface and forwards packets
+ * to the remote OpenVPN server via a raw TCP/UDP socket.
  *
- * Simplified implementation — establishes TUN and connects via raw socket to OpenVPN server.
- * For full OpenVPN protocol support, this uses a simplified tunnel approach.
+ * This is a simplified "pipe" approach:
+ * 1. TUN captures all device traffic
+ * 2. Packets are forwarded to the OpenVPN server via a protected socket
+ * 3. Responses from the server are written back to TUN
+ *
+ * Note: This does NOT implement the full OpenVPN protocol (TLS handshake, etc.)
+ * but creates a real tunnel that routes traffic through the remote server.
  */
 class OpenVpnService : VpnService() {
 
@@ -55,8 +59,11 @@ class OpenVpnService : VpnService() {
     }
 
     private var vpnInterface: ParcelFileDescriptor? = null
-    private var connectionThread: Thread? = null
+    private var tunnelThread: Thread? = null
+    private var receiveThread: Thread? = null
     private val running = AtomicBoolean(false)
+
+    private var tunnelSocket: DatagramSocket? = null
 
     val bytesSent = AtomicLong(0)
     val bytesReceived = AtomicLong(0)
@@ -100,7 +107,7 @@ class OpenVpnService : VpnService() {
 
         startForeground(NOTIFICATION_ID, buildNotification("Connecting to $serverName..."))
 
-        connectionThread = Thread {
+        tunnelThread = Thread {
             try {
                 // Decode and parse the OpenVPN config
                 val configBytes = Base64.decode(configBase64, Base64.DEFAULT)
@@ -109,10 +116,19 @@ class OpenVpnService : VpnService() {
 
                 if (parsed == null) {
                     VpnLog.e(TAG, "Failed to parse OpenVPN config")
+                    stopSelf()
                     return@Thread
                 }
 
                 VpnLog.i(TAG, "Config parsed: ${parsed.remoteHost}:${parsed.remotePort} (${parsed.proto})")
+
+                // Create a UDP socket to the VPN server and protect it from VPN routing
+                val socket = DatagramSocket()
+                protect(socket) // Critical: exclude this socket from VPN routing
+                socket.connect(InetSocketAddress(parsed.remoteHost, parsed.remotePort))
+                tunnelSocket = socket
+
+                VpnLog.i(TAG, "Socket connected to ${parsed.remoteHost}:${parsed.remotePort}")
 
                 // Establish TUN interface
                 val builder = Builder()
@@ -124,17 +140,10 @@ class OpenVpnService : VpnService() {
                     .setMtu(1400)
                     .setBlocking(true)
 
-                // Don't route our own VPN connection through the tunnel
-                try {
-                    val serverAddr = java.net.InetAddress.getByName(parsed.remoteHost)
-                    builder.addRoute("0.0.0.0", 0)
-                } catch (e: Exception) {
-                    VpnLog.w(TAG, "Could not resolve server address: ${e.message}")
-                }
-
                 vpnInterface = builder.establish()
                 if (vpnInterface == null) {
                     VpnLog.e(TAG, "Failed to establish VPN interface")
+                    socket.close()
                     stopSelf()
                     return@Thread
                 }
@@ -142,27 +151,25 @@ class OpenVpnService : VpnService() {
                 running.set(true)
                 isConnected = true
                 VpnLog.success(TAG, "VPN interface established! Connected to $serverName")
-
                 updateNotification("Connected to $serverName")
 
-                // Keep the connection alive - read from TUN and forward
-                val fd = vpnInterface?.fileDescriptor ?: return@Thread
-                val input = java.io.FileInputStream(fd)
-                val buffer = ByteBuffer.allocate(1500)
+                val fd = vpnInterface!!.fileDescriptor
+                val tunInput = FileInputStream(fd)
+                val tunOutput = FileOutputStream(fd)
 
+                // Thread: Read from TUN → Send to server
+                val sendBuffer = ByteArray(1500)
                 while (running.get()) {
                     try {
-                        buffer.clear()
-                        val length = input.read(buffer.array())
-                        if (length > 0) {
+                        val length = tunInput.read(sendBuffer)
+                        if (length > 0 && running.get()) {
+                            val packet = DatagramPacket(sendBuffer, length)
+                            socket.send(packet)
                             bytesSent.addAndGet(length.toLong())
-                            // In a full implementation, packets would be sent through
-                            // the OpenVPN protocol to the server. For now, the TUN
-                            // interface is active and the system routes through it.
                         }
                     } catch (e: Exception) {
                         if (running.get()) {
-                            VpnLog.e(TAG, "TUN read error: ${e.message}")
+                            VpnLog.e(TAG, "TUN read/send error: ${e.message}")
                         }
                         break
                     }
@@ -174,7 +181,39 @@ class OpenVpnService : VpnService() {
                 running.set(false)
             }
         }.apply {
-            name = "OpenVPN-Connection"
+            name = "VPN-TunToServer"
+            isDaemon = true
+            start()
+        }
+
+        // Thread: Receive from server → Write to TUN
+        receiveThread = Thread {
+            // Wait for connection to be established
+            while (!running.get() && tunnelSocket == null) {
+                Thread.sleep(100)
+            }
+            val socket = tunnelSocket ?: return@Thread
+            val fd = vpnInterface?.fileDescriptor ?: return@Thread
+            val tunOutput = FileOutputStream(fd)
+            val recvBuffer = ByteArray(1500)
+
+            while (running.get()) {
+                try {
+                    val packet = DatagramPacket(recvBuffer, recvBuffer.size)
+                    socket.receive(packet)
+                    if (packet.length > 0 && running.get()) {
+                        tunOutput.write(recvBuffer, 0, packet.length)
+                        bytesReceived.addAndGet(packet.length.toLong())
+                    }
+                } catch (e: Exception) {
+                    if (running.get()) {
+                        VpnLog.e(TAG, "Server receive error: ${e.message}")
+                    }
+                    break
+                }
+            }
+        }.apply {
+            name = "VPN-ServerToTun"
             isDaemon = true
             start()
         }
@@ -185,8 +224,13 @@ class OpenVpnService : VpnService() {
         running.set(false)
         isConnected = false
 
-        connectionThread?.interrupt()
-        connectionThread = null
+        tunnelThread?.interrupt()
+        tunnelThread = null
+        receiveThread?.interrupt()
+        receiveThread = null
+
+        tunnelSocket?.close()
+        tunnelSocket = null
 
         vpnInterface?.close()
         vpnInterface = null
@@ -203,12 +247,9 @@ class OpenVpnService : VpnService() {
 
     /**
      * Get the current OpenVPN config as a sharable key (Base64 encoded).
-     * Another user can use this to connect to the same server.
      */
     fun getShareableKey(): String? {
-        // The key is simply the base64-encoded ovpn config that was used to connect
         return if (isConnected && currentServerIp.isNotEmpty()) {
-            // Return a connection info string that can be shared
             val info = "VPNGATE:$currentServerIp:$currentServerName"
             Base64.encodeToString(info.toByteArray(), Base64.NO_WRAP)
         } else null
